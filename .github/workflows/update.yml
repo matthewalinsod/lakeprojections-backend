@@ -12,14 +12,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Print Debug Info
+        run: |
+          echo "Render URL:"
+          echo "${{ secrets.RENDER_UPDATE_URL }}"
+          echo ""
+          echo "Token length:"
+          echo "${{ secrets.UPDATE_TOKEN }}" | wc -c
+
       - name: Trigger Historic Update
         run: |
-          curl -X POST \
+          curl -v -X POST \
           -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
-          ${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic
+          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic"
 
       - name: Trigger Forecast Update
         run: |
-          curl -X POST \
+          curl -v -X POST \
           -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
-          ${{ secrets.RENDER_UPDATE_URL }}/internal/update/forecast
+          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/forecast"
