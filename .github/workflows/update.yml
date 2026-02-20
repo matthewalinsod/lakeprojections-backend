@@ -1,0 +1,25 @@
+name: LakeProjections Updates
+
+on:
+  schedule:
+    - cron: '10 8 * * *'   # Midnight PT (approx UTC)
+    - cron: '30 17 * * *'  # 9:30 AM PT
+    - cron: '0 22 * * *'   # 2:00 PM PT
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Historic Update
+        run: |
+          curl -X POST \
+          -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
+          ${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic
+
+      - name: Trigger Forecast Update
+        run: |
+          curl -X POST \
+          -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
+          ${{ secrets.RENDER_UPDATE_URL }}/internal/update/forecast
