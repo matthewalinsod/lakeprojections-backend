@@ -20,14 +20,48 @@ jobs:
           echo "Token length:"
           echo "${{ secrets.UPDATE_TOKEN }}" | wc -c
 
-      - name: Trigger Historic Update
+      # =========================
+      # HISTORIC DAILY
+      # =========================
+      - name: Trigger Historic Daily Update
         run: |
+          echo "---- Running Historic Daily Update ----"
           curl -v -X POST \
           -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
           "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic"
+          echo "Waiting 10 seconds..."
+          sleep 10
 
-      - name: Trigger Forecast Update
+      # =========================
+      # HISTORIC HOURLY
+      # =========================
+      - name: Trigger Historic Hourly Update
         run: |
+          echo "---- Running Historic Hourly Update ----"
+          curl -v -X POST \
+          -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
+          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic/hourly"
+          echo "Waiting 10 seconds..."
+          sleep 10
+
+      # =========================
+      # FORECAST DAILY
+      # =========================
+      - name: Trigger Forecast Daily Update
+        run: |
+          echo "---- Running Forecast Daily Update ----"
+          curl -v -X POST \
+          -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
+          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/forecast/daily"
+          echo "Waiting 10 seconds..."
+          sleep 10
+
+      # =========================
+      # FORECAST HOURLY
+      # =========================
+      - name: Trigger Forecast Hourly Update
+        run: |
+          echo "---- Running Forecast Hourly Update ----"
           curl -v -X POST \
           -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
           "${{ secrets.RENDER_UPDATE_URL }}/internal/update/forecast"
