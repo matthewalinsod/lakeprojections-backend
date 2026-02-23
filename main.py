@@ -26,7 +26,7 @@ def get_db_connection():
 
 def authorize(req):
     token = req.headers.get("X-Update-Token")
-    print("HEADER TOKEN:", repr(header_token))
+    print("HEADER TOKEN:", repr(token))
     print("ENV TOKEN:", repr(UPDATE_TOKEN))
     return token == UPDATE_TOKEN
 
