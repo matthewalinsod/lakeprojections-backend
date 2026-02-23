@@ -2,9 +2,9 @@ name: LakeProjections Updates
 
 on:
   schedule:
-    - cron: '10 8 * * *'   # Midnight PT (approx UTC)
-    - cron: '30 17 * * *'  # 9:30 AM PT
-    - cron: '0 22 * * *'   # 2:00 PM PT
+    - cron: '15 8 * * *'   # ~12:15 AM Nevada (1:15 AM during DST)
+    - cron: '30 17 * * *'  # ~9:30 AM Nevada (10:30 AM during DST)
+    - cron: '0 22 * * *'   # ~2:00 PM Nevada (3:00 PM during DST)
   workflow_dispatch:
 
 jobs:
