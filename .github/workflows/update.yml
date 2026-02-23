@@ -2,8 +2,8 @@ name: LakeProjections Updates
 
 on:
   schedule:
-    - cron: '15 8 * * *'   # ~12:15 AM Nevada (1:15 AM during DST)
-    - cron: '30 17 * * *'  # ~9:30 AM Nevada (10:30 AM during DST)
+    - cron: '0 8 * * *'    # ~12:00 AM Nevada (1:00 AM during DST)
+    - cron: '0 17 * * *'  # ~9:00 AM Nevada (10:30 AM during DST)
     - cron: '0 22 * * *'   # ~2:00 PM Nevada (3:00 PM during DST)
   workflow_dispatch:
 
@@ -27,20 +27,17 @@ jobs:
         id: mode
         run: |
           HOUR=$(date -u +"%H")
-          MIN=$(date -u +"%M")
 
           echo "UTC Hour: $HOUR"
-          echo "UTC Minute: $MIN"
 
-          # 08:15 UTC → Historic
-          if [ "$HOUR" = "08" ] && [ "$MIN" = "15" ]; then
+          # 08 UTC → Historic
+          if [ "$HOUR" = "08" ]; then
             echo "type=historic" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # 17:30 UTC or 22:00 UTC → Forecast
-          if { [ "$HOUR" = "17" ] && [ "$MIN" = "30" ]; } || \
-             { [ "$HOUR" = "22" ] && [ "$MIN" = "00" ]; }; then
+          # 17 UTC or 22 UTC → Forecast
+          if [ "$HOUR" = "17" ] || [ "$HOUR" = "22" ]; then
             echo "type=forecast" >> $GITHUB_OUTPUT
             exit 0
           fi
