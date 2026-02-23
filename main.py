@@ -26,8 +26,6 @@ def get_db_connection():
 
 def authorize(req):
     token = req.headers.get("X-Update-Token")
-    print("HEADER TOKEN:", repr(token))
-    print("ENV TOKEN:", repr(UPDATE_TOKEN))
     return token == UPDATE_TOKEN
 
 
@@ -38,6 +36,11 @@ def authorize(req):
 @app.route("/")
 def home():
     return jsonify({"status": "LakeProjections API is running"})
+
+
+@app.route("/health")
+def health():
+    return "OK", 200
 
 
 # ==============================
@@ -196,6 +199,77 @@ def update_forecast():
         "forecast_skipped": skipped,
         "range_start": t1,
         "range_end": t2
+    })
+
+
+# ==============================
+# DEBUG ENDPOINTS (PROTECTED)
+# ==============================
+
+@app.route("/debug/historic/latest", methods=["GET"])
+def debug_latest_historic():
+
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM historic_daily_data
+        ORDER BY historic_datetime DESC
+        LIMIT 10
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([dict(row) for row in rows])
+
+
+@app.route("/debug/forecast/latest", methods=["GET"])
+def debug_latest_forecast():
+
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM forecasted_hourly_data
+        ORDER BY forecasted_datetime DESC
+        LIMIT 10
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([dict(row) for row in rows])
+
+
+@app.route("/debug/counts", methods=["GET"])
+def debug_counts():
+
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM historic_daily_data")
+    historic_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM forecasted_hourly_data")
+    forecast_count = cursor.fetchone()[0]
+
+    conn.close()
+
+    return jsonify({
+        "historic_rows": historic_count,
+        "forecast_rows": forecast_count
     })
 
 
