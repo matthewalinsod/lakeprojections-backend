@@ -126,6 +126,173 @@ def update_historic():
         "range_end": t2
     })
 
+# ==============================
+# HISTORIC HOURLY UPDATE
+# ==============================
+
+@app.route("/internal/update/historic/hourly", methods=["POST"])
+def update_historic_hourly():
+
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Find latest datetime in table
+    cursor.execute("SELECT MAX(historic_datetime) FROM historic_hourly_data")
+    max_dt = cursor.fetchone()[0]
+
+    if not max_dt:
+        conn.close()
+        return jsonify({"error": "No existing historic hourly data found"}), 400
+
+    last_dt = datetime.strptime(max_dt, "%Y-%m-%dT%H:%M:%S")
+    start_dt = last_dt + timedelta(hours=1)
+
+    today_utc = datetime.utcnow().date()
+    end_dt = datetime.combine(today_utc, datetime.min.time())  # Midnight today UTC
+
+    if start_dt >= end_dt:
+        conn.close()
+        return jsonify({"status": "No historic hourly update needed"})
+
+    t1 = start_dt.strftime("%Y-%m-%dT%H:%M")
+    t2 = end_dt.strftime("%Y-%m-%dT%H:%M")
+
+    api_url = (
+        "https://www.usbr.gov/pn-bin/hdb/hdb.pl"
+        f"?svr=lchdb"
+        f"&sdi=2166%2C2146%2C14163%2C14164%2C14165%2C14166%2C14167%2C14168%2C14169%2C14170%2C14171"
+        f"&tstp=HR"
+        f"&t1={t1}"
+        f"&t2={t2}"
+        f"&table=R"
+        f"&mrid=2"
+        f"&format=json"
+    )
+
+    try:
+        response = requests.get(api_url, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": "API failure", "details": str(e)}), 500
+
+    inserted = 0
+    skipped = 0
+
+    for series in data.get("Series", []):
+        sd_id = int(series["SDI"])
+
+        for point in series.get("Data", []):
+            try:
+                dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
+                iso_dt = dt.strftime("%Y-%m-%dT%H:%M:%S")
+                value = float(point["v"])
+
+                cursor.execute("""
+                    INSERT OR IGNORE INTO historic_hourly_data
+                    (historic_datetime, sd_id, value)
+                    VALUES (?, ?, ?)
+                """, (iso_dt, sd_id, value))
+
+                inserted += cursor.rowcount
+
+            except:
+                skipped += 1
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "historic_hourly_inserted": inserted,
+        "historic_hourly_skipped": skipped,
+        "range_start": t1,
+        "range_end": t2
+    })
+
+# ==============================
+# FORECAST DAILY UPDATE
+# ==============================
+
+@app.route("/internal/update/forecast/daily", methods=["POST"])
+def update_forecast_daily():
+
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    today = datetime.utcnow()
+    start_date = today.strftime("%Y-%m-%dT00:00")
+    end_date = (today + timedelta(days=90)).strftime("%Y-%m-%dT00:00")
+
+    datetime_accessed = today.strftime("%Y-%m-%dT%H:%M:%S")
+
+    SDI_LIST = "1930,1863,2070,2100,2166,2071,2101,2146,2072"
+
+    api_url = (
+        "https://www.usbr.gov/pn-bin/hdb/hdb.pl"
+        f"?svr=lchdb"
+        f"&sdi={SDI_LIST}"
+        f"&tstp=DY"
+        f"&t1={start_date}"
+        f"&t2={end_date}"
+        f"&table=M"
+        f"&mrid=4"
+        f"&format=json"
+    )
+
+    try:
+        response = requests.get(api_url, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": "API failure", "details": str(e)}), 500
+
+    # Load valid SDIDs
+    cursor.execute("SELECT sd_id FROM sdid_mapping")
+    valid_sdids = {row[0] for row in cursor.fetchall()}
+
+    inserted = 0
+    skipped = 0
+
+    for series in data.get("Series", []):
+        sd_id = int(series["SDI"])
+
+        if sd_id not in valid_sdids:
+            continue
+
+        for point in series.get("Data", []):
+            try:
+                dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
+                iso_dt = dt.strftime("%Y-%m-%dT%H:%M:%S")
+                value = float(point["v"])
+
+                cursor.execute("""
+                    INSERT OR IGNORE INTO forecasted_daily_data
+                    (forecasted_datetime, sd_id, datetime_accessed, value)
+                    VALUES (?, ?, ?, ?)
+                """, (iso_dt, sd_id, datetime_accessed, value))
+
+                inserted += cursor.rowcount
+
+            except:
+                skipped += 1
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "forecast_daily_inserted": inserted,
+        "forecast_daily_skipped": skipped,
+        "range_start": start_date,
+        "range_end": end_date
+    })
 
 # ==============================
 # FORECAST HOURLY UPDATE
