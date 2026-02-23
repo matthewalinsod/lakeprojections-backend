@@ -50,6 +50,8 @@ def health():
 @app.route("/internal/update/historic", methods=["POST"])
 def update_historic():
 
+    print("=== HISTORIC DAILY UPDATE STARTED ===")
+
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
 
@@ -58,6 +60,7 @@ def update_historic():
 
     cursor.execute("SELECT MAX(historic_datetime) FROM historic_daily_data")
     max_dt = cursor.fetchone()[0]
+    print("Max datetime before update:", max_dt)
 
     if not max_dt:
         conn.close()
@@ -68,11 +71,14 @@ def update_historic():
     yesterday = datetime.utcnow().date() - timedelta(days=1)
 
     if start_date.date() > yesterday:
+        print("Historic daily already up to date.")
         conn.close()
         return jsonify({"status": "No historic update needed"})
 
     t1 = start_date.strftime("%Y-%m-%dT00:00")
     t2 = (yesterday + timedelta(days=1)).strftime("%Y-%m-%dT00:00")
+
+    print("Requesting range:", t1, "to", t2)
 
     api_url = (
         "https://www.usbr.gov/pn-bin/hdb/hdb.pl"
@@ -98,7 +104,6 @@ def update_historic():
 
     for series in data.get("Series", []):
         sd_id = int(series["SDI"])
-
         for point in series.get("Data", []):
             try:
                 dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
@@ -112,11 +117,19 @@ def update_historic():
                 """, (iso_dt, sd_id, value))
 
                 inserted += cursor.rowcount
-
             except:
                 skipped += 1
 
     conn.commit()
+
+    cursor.execute("SELECT MAX(historic_datetime) FROM historic_daily_data")
+    new_max = cursor.fetchone()[0]
+
+    print("Inserted:", inserted)
+    print("Skipped:", skipped)
+    print("Max datetime after update:", new_max)
+    print("=== HISTORIC DAILY UPDATE COMPLETE ===")
+
     conn.close()
 
     return jsonify({
@@ -126,6 +139,7 @@ def update_historic():
         "range_end": t2
     })
 
+
 # ==============================
 # HISTORIC HOURLY UPDATE
 # ==============================
@@ -133,15 +147,17 @@ def update_historic():
 @app.route("/internal/update/historic/hourly", methods=["POST"])
 def update_historic_hourly():
 
+    print("=== HISTORIC HOURLY UPDATE STARTED ===")
+
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Find latest datetime in table
     cursor.execute("SELECT MAX(historic_datetime) FROM historic_hourly_data")
     max_dt = cursor.fetchone()[0]
+    print("Max datetime before update:", max_dt)
 
     if not max_dt:
         conn.close()
@@ -151,14 +167,17 @@ def update_historic_hourly():
     start_dt = last_dt + timedelta(hours=1)
 
     today_utc = datetime.utcnow().date()
-    end_dt = datetime.combine(today_utc, datetime.min.time())  # Midnight today UTC
+    end_dt = datetime.combine(today_utc, datetime.min.time())
 
     if start_dt >= end_dt:
+        print("Historic hourly already up to date.")
         conn.close()
         return jsonify({"status": "No historic hourly update needed"})
 
     t1 = start_dt.strftime("%Y-%m-%dT%H:%M")
     t2 = end_dt.strftime("%Y-%m-%dT%H:%M")
+
+    print("Requesting range:", t1, "to", t2)
 
     api_url = (
         "https://www.usbr.gov/pn-bin/hdb/hdb.pl"
@@ -185,7 +204,6 @@ def update_historic_hourly():
 
     for series in data.get("Series", []):
         sd_id = int(series["SDI"])
-
         for point in series.get("Data", []):
             try:
                 dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
@@ -199,11 +217,19 @@ def update_historic_hourly():
                 """, (iso_dt, sd_id, value))
 
                 inserted += cursor.rowcount
-
             except:
                 skipped += 1
 
     conn.commit()
+
+    cursor.execute("SELECT MAX(historic_datetime) FROM historic_hourly_data")
+    new_max = cursor.fetchone()[0]
+
+    print("Inserted:", inserted)
+    print("Skipped:", skipped)
+    print("Max datetime after update:", new_max)
+    print("=== HISTORIC HOURLY UPDATE COMPLETE ===")
+
     conn.close()
 
     return jsonify({
@@ -213,12 +239,15 @@ def update_historic_hourly():
         "range_end": t2
     })
 
+
 # ==============================
 # FORECAST DAILY UPDATE
 # ==============================
 
 @app.route("/internal/update/forecast/daily", methods=["POST"])
 def update_forecast_daily():
+
+    print("=== FORECAST DAILY UPDATE STARTED ===")
 
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
@@ -229,8 +258,9 @@ def update_forecast_daily():
     today = datetime.utcnow()
     start_date = today.strftime("%Y-%m-%dT00:00")
     end_date = (today + timedelta(days=90)).strftime("%Y-%m-%dT00:00")
-
     datetime_accessed = today.strftime("%Y-%m-%dT%H:%M:%S")
+
+    print("Requesting range:", start_date, "to", end_date)
 
     SDI_LIST = "1930,1863,2070,2100,2166,2071,2101,2146,2072"
 
@@ -254,7 +284,6 @@ def update_forecast_daily():
         conn.close()
         return jsonify({"error": "API failure", "details": str(e)}), 500
 
-    # Load valid SDIDs
     cursor.execute("SELECT sd_id FROM sdid_mapping")
     valid_sdids = {row[0] for row in cursor.fetchall()}
 
@@ -263,10 +292,8 @@ def update_forecast_daily():
 
     for series in data.get("Series", []):
         sd_id = int(series["SDI"])
-
         if sd_id not in valid_sdids:
             continue
-
         for point in series.get("Data", []):
             try:
                 dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
@@ -280,11 +307,23 @@ def update_forecast_daily():
                 """, (iso_dt, sd_id, datetime_accessed, value))
 
                 inserted += cursor.rowcount
-
             except:
                 skipped += 1
 
     conn.commit()
+
+    cursor.execute("SELECT MAX(forecasted_datetime) FROM forecasted_daily_data")
+    max_forecast = cursor.fetchone()[0]
+
+    cursor.execute("SELECT MAX(datetime_accessed) FROM forecasted_daily_data")
+    max_accessed = cursor.fetchone()[0]
+
+    print("Inserted:", inserted)
+    print("Skipped:", skipped)
+    print("Max forecasted_datetime:", max_forecast)
+    print("Max datetime_accessed:", max_accessed)
+    print("=== FORECAST DAILY UPDATE COMPLETE ===")
+
     conn.close()
 
     return jsonify({
@@ -294,12 +333,15 @@ def update_forecast_daily():
         "range_end": end_date
     })
 
+
 # ==============================
 # FORECAST HOURLY UPDATE
 # ==============================
 
 @app.route("/internal/update/forecast", methods=["POST"])
 def update_forecast():
+
+    print("=== FORECAST HOURLY UPDATE STARTED ===")
 
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
@@ -312,8 +354,9 @@ def update_forecast():
 
     t1 = today.strftime("%Y-%m-%dT00:00")
     t2 = end_date.strftime("%Y-%m-%dT00:00")
-
     now_accessed = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+
+    print("Requesting range:", t1, "to", t2)
 
     api_url = (
         "https://www.usbr.gov/pn-bin/hdb/hdb.pl"
@@ -340,7 +383,6 @@ def update_forecast():
 
     for series in data.get("Series", []):
         sd_id = int(series["SDI"])
-
         for point in series.get("Data", []):
             try:
                 dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
@@ -354,11 +396,23 @@ def update_forecast():
                 """, (iso_dt, sd_id, now_accessed, value))
 
                 inserted += cursor.rowcount
-
             except:
                 skipped += 1
 
     conn.commit()
+
+    cursor.execute("SELECT MAX(forecasted_datetime) FROM forecasted_hourly_data")
+    max_forecast = cursor.fetchone()[0]
+
+    cursor.execute("SELECT MAX(datetime_accessed) FROM forecasted_hourly_data")
+    max_accessed = cursor.fetchone()[0]
+
+    print("Inserted:", inserted)
+    print("Skipped:", skipped)
+    print("Max forecasted_datetime:", max_forecast)
+    print("Max datetime_accessed:", max_accessed)
+    print("=== FORECAST HOURLY UPDATE COMPLETE ===")
+
     conn.close()
 
     return jsonify({
@@ -366,77 +420,6 @@ def update_forecast():
         "forecast_skipped": skipped,
         "range_start": t1,
         "range_end": t2
-    })
-
-
-# ==============================
-# DEBUG ENDPOINTS (PROTECTED)
-# ==============================
-
-@app.route("/debug/historic/latest", methods=["GET"])
-def debug_latest_historic():
-
-    if not authorize(request):
-        return jsonify({"error": "Unauthorized"}), 403
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT *
-        FROM historic_daily_data
-        ORDER BY historic_datetime DESC
-        LIMIT 10
-    """)
-
-    rows = cursor.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-
-
-@app.route("/debug/forecast/latest", methods=["GET"])
-def debug_latest_forecast():
-
-    if not authorize(request):
-        return jsonify({"error": "Unauthorized"}), 403
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT *
-        FROM forecasted_hourly_data
-        ORDER BY forecasted_datetime DESC
-        LIMIT 10
-    """)
-
-    rows = cursor.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-
-
-@app.route("/debug/counts", methods=["GET"])
-def debug_counts():
-
-    if not authorize(request):
-        return jsonify({"error": "Unauthorized"}), 403
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT COUNT(*) FROM historic_daily_data")
-    historic_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM forecasted_hourly_data")
-    forecast_count = cursor.fetchone()[0]
-
-    conn.close()
-
-    return jsonify({
-        "historic_rows": historic_count,
-        "forecast_rows": forecast_count
     })
 
 
