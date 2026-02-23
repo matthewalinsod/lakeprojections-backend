@@ -19,11 +19,39 @@ jobs:
           echo ""
           echo "Token length:"
           echo "${{ secrets.UPDATE_TOKEN }}" | wc -c
+          echo ""
+          echo "Current UTC time:"
+          date -u
+
+      - name: Determine Run Mode
+        id: mode
+        run: |
+          HOUR=$(date -u +"%H")
+          MIN=$(date -u +"%M")
+
+          echo "UTC Hour: $HOUR"
+          echo "UTC Minute: $MIN"
+
+          # 08:15 UTC → Historic
+          if [ "$HOUR" = "08" ] && [ "$MIN" = "15" ]; then
+            echo "type=historic" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 17:30 UTC or 22:00 UTC → Forecast
+          if { [ "$HOUR" = "17" ] && [ "$MIN" = "30" ]; } || \
+             { [ "$HOUR" = "22" ] && [ "$MIN" = "00" ]; }; then
+            echo "type=forecast" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "type=none" >> $GITHUB_OUTPUT
 
       # =========================
       # HISTORIC DAILY
       # =========================
       - name: Trigger Historic Daily Update
+        if: steps.mode.outputs.type == 'historic'
         run: |
           echo "---- Running Historic Daily Update ----"
           curl -v -X POST \
@@ -36,6 +64,7 @@ jobs:
       # HISTORIC HOURLY
       # =========================
       - name: Trigger Historic Hourly Update
+        if: steps.mode.outputs.type == 'historic'
         run: |
           echo "---- Running Historic Hourly Update ----"
           curl -v -X POST \
@@ -48,6 +77,7 @@ jobs:
       # FORECAST DAILY
       # =========================
       - name: Trigger Forecast Daily Update
+        if: steps.mode.outputs.type == 'forecast'
         run: |
           echo "---- Running Forecast Daily Update ----"
           curl -v -X POST \
@@ -60,6 +90,7 @@ jobs:
       # FORECAST HOURLY
       # =========================
       - name: Trigger Forecast Hourly Update
+        if: steps.mode.outputs.type == 'forecast'
         run: |
           echo "---- Running Forecast Hourly Update ----"
           curl -v -X POST \
