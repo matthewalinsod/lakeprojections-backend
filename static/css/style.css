@@ -1,1 +1,70 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+}
 
+.site-header {
+    background-color: #1e2a38;
+    color: white;
+    padding: 16px;
+    text-align: center;
+}
+
+.main-content {
+    padding: 20px;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.tab-button {
+    padding: 8px 16px;
+    border: none;
+    cursor: pointer;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+}
+
+.tab-button.active {
+    background-color: #1e2a38;
+    color: white;
+}
+
+.current-dam {
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.card {
+    background-color: white;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.chart-placeholder {
+    height: 250px;
+    background-color: #e9edf2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    border-radius: 4px;
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
