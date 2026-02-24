@@ -47,14 +47,23 @@ function renderElevationChart(containerId, payload) {
       top: 10
     },
     xAxis: {
-      type: "time",
-      axisLabel: {
-        formatter: function (value) {
-          const d = new Date(value);
-          return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
-        }
-      }
-    },
+  type: "time",
+  axisLabel: {
+    hideOverlap: true,
+    formatter: function (value) {
+      const d = new Date(value);
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const year = d.getFullYear();
+
+      return `${month}/${day}/${year}`;
+    }
+  },
+  axisTick: {
+    alignWithLabel: true
+  },
+  splitNumber: 6   // controls density
+},
     yAxis: {
       type: "value",
       scale: true
