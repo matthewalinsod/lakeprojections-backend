@@ -3,6 +3,7 @@ import sqlite3
 import os
 import requests
 from datetime import datetime, timedelta
+from flask import render_template
 
 app = Flask(__name__)
 
@@ -34,8 +35,8 @@ def authorize(req):
 # ==============================
 
 @app.route("/")
-def home():
-    return jsonify({"status": "LakeProjections API is running"})
+def dashboard():
+    return render_template("dashboard.html")
 
 
 @app.route("/health")
