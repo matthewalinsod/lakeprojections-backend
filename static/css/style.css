@@ -62,6 +62,40 @@ body {
     border-radius: 4px;
 }
 
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.range-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.range-btn {
+  padding: 6px 10px;
+  border: none;
+  cursor: pointer;
+  background: #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.range-btn.active {
+  background: #1e2a38;
+  color: white;
+}
+
+.chart {
+  height: 280px;
+  margin-top: 10px;
+  background: #f7f9fc;
+  border-radius: 6px;
+}
+
 /* Mobile */
 @media (max-width: 900px) {
     .dashboard-grid {
