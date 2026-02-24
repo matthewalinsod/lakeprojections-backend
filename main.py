@@ -130,10 +130,10 @@ def create_db_indexes():
 def api_elevation():
     """
     Returns merged historic + forecast daily elevation for a dam.
-    Query params:
-      - dam: hoover | davis | parker
-      - range: 30d | 90d | 365d | 5y
+    Range options:
+      30d (MTD), 90d (3M), 365d (YTD), 5y
     """
+
     dam = (request.args.get("dam") or "hoover").lower().strip()
     range_key = (request.args.get("range") or "30d").lower().strip()
 
@@ -151,25 +151,34 @@ def api_elevation():
     }
 
     if dam not in dam_to_sdid:
-        return jsonify({"error": "Invalid dam. Use hoover, davis, parker."}), 400
+        return jsonify({"error": "Invalid dam"}), 400
     if range_key not in range_days:
-        return jsonify({"error": "Invalid range. Use 30d, 90d, 365d, 5y."}), 400
+        return jsonify({"error": "Invalid range"}), 400
 
     sd_id = dam_to_sdid[dam]
     days_back = range_days[range_key]
 
-    # We'll anchor "today" at UTC midnight for consistency with your DB update logic
-    today_utc = datetime.utcnow().date()
-    today_midnight = datetime.combine(today_utc, datetime.min.time())
-    start_dt = today_midnight - timedelta(days=days_back)
-
-    start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%S")
-    today_iso = today_midnight.strftime("%Y-%m-%dT%H:%M:%S")
-
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1) Historic daily: from start -> today (inclusive)
+    # Determine true cutover = latest historic timestamp
+    cursor.execute("""
+        SELECT MAX(historic_datetime)
+        FROM historic_daily_data
+        WHERE sd_id = ?
+    """, (sd_id,))
+    cutover = cursor.fetchone()[0]
+
+    if not cutover:
+        conn.close()
+        return jsonify({"error": "No historic data found"}), 400
+
+    cutover_dt = datetime.strptime(cutover, "%Y-%m-%dT%H:%M:%S")
+    start_dt = cutover_dt - timedelta(days=days_back)
+
+    start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+    # Historic window
     cursor.execute("""
         SELECT historic_datetime, value
         FROM historic_daily_data
@@ -177,10 +186,12 @@ def api_elevation():
           AND historic_datetime >= ?
           AND historic_datetime <= ?
         ORDER BY historic_datetime ASC
-    """, (sd_id, start_iso, today_iso))
+    """, (sd_id, start_iso, cutover))
     historic_rows = cursor.fetchall()
 
-    # 2) Forecast daily: use the latest datetime_accessed for that sd_id, from today -> forward
+    last_hist_value = historic_rows[-1]["value"] if historic_rows else None
+
+    # Latest forecast run
     cursor.execute("""
         SELECT MAX(datetime_accessed)
         FROM forecasted_daily_data
@@ -197,25 +208,24 @@ def api_elevation():
               AND datetime_accessed = ?
               AND forecasted_datetime >= ?
             ORDER BY forecasted_datetime ASC
-        """, (sd_id, latest_accessed, today_iso))
+        """, (sd_id, latest_accessed, cutover))
         forecast_rows = cursor.fetchall()
 
     conn.close()
 
-    # Convert to ECharts-friendly arrays:
-    # We return ISO strings and let JS convert to timestamps.
     historic = [{"t": r["historic_datetime"], "v": r["value"]} for r in historic_rows]
     forecast = [{"t": r["forecasted_datetime"], "v": r["value"]} for r in forecast_rows]
 
     return jsonify({
         "dam": dam,
-        "sd_id": sd_id,
         "range": range_key,
-        "range_start": start_iso,
-        "today_line": today_iso,
-        "forecast_datetime_accessed": latest_accessed,
+        "cutover": cutover,
         "historic": historic,
-        "forecast": forecast
+        "forecast": forecast,
+        "last_historic": {
+            "t": cutover,
+            "v": last_hist_value
+        }
     })
 
 # ==============================
