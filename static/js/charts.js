@@ -1,7 +1,11 @@
 let elevationChartInstance = null;
+let chart24msInstance = null;
+
+// ==============================
+// UTILITIES
+// ==============================
 
 function isoToMs(iso) {
-  // Interpret timestamps exactly as stored (no forced UTC)
   return new Date(iso).getTime();
 }
 
@@ -10,6 +14,15 @@ function buildSeriesPoints(rows) {
     .filter(r => r.t && r.v !== null && r.v !== undefined)
     .map(r => [isoToMs(r.t), Number(r.v)]);
 }
+
+function getActiveDam() {
+  const activeTab = document.querySelector(".tab-button.active");
+  return activeTab ? activeTab.dataset.dam : "hoover";
+}
+
+// ==============================
+// GRAPH 1 — Elevation
+// ==============================
 
 function renderElevationChart(containerId, payload) {
   const el = document.getElementById(containerId);
@@ -24,7 +37,6 @@ function renderElevationChart(containerId, payload) {
   let forecast = buildSeriesPoints(payload.forecast || []);
   const cutoverMs = isoToMs(payload.cutover);
 
-  // --- Stitch forecast to historic ---
   if (payload.last_historic && payload.last_historic.t && payload.last_historic.v !== null) {
     const stitchPoint = [
       isoToMs(payload.last_historic.t),
@@ -43,27 +55,18 @@ function renderElevationChart(containerId, payload) {
       trigger: "axis",
       axisPointer: { type: "cross" }
     },
-    legend: {
-      top: 10
-    },
+    legend: { top: 10 },
     xAxis: {
-  type: "time",
-  axisLabel: {
-    hideOverlap: true,
-    formatter: function (value) {
-      const d = new Date(value);
-      const month = d.getMonth() + 1;
-      const day = d.getDate();
-      const year = d.getFullYear();
-
-      return `${month}/${day}/${year}`;
-    }
-  },
-  axisTick: {
-    alignWithLabel: true
-  },
-  splitNumber: 6   // controls density
-},
+      type: "time",
+      axisLabel: {
+        hideOverlap: true,
+        formatter: function (value) {
+          const d = new Date(value);
+          return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+        }
+      },
+      splitNumber: 6
+    },
     yAxis: {
       type: "value",
       scale: true
@@ -88,7 +91,6 @@ function renderElevationChart(containerId, payload) {
 
   elevationChartInstance.setOption(option, true);
 
-  // --- Draw Today vertical line + label ---
   function drawTodayLine() {
     const xPixel = elevationChartInstance.convertToPixel({ xAxisIndex: 0 }, cutoverMs);
     const grid = elevationChartInstance.getModel().getComponent("grid").coordinateSystem.getRect();
@@ -103,25 +105,21 @@ function renderElevationChart(containerId, payload) {
             x2: xPixel,
             y2: grid.y + grid.height
           },
-          style: {
-            stroke: "#000",
-            lineWidth: 2
-          },
+          style: { stroke: "#000", lineWidth: 2 },
           silent: true
         },
         {
-  type: "text",
-  left: xPixel,
-  top: grid.y - 22,
-  style: {
-    text: "Today",
-    fill: "#000",
-    font: "bold 12px Arial",
-    textAlign: "center"
-  },
-  origin: [xPixel, 0],
-  silent: true
-}
+          type: "text",
+          left: xPixel,
+          top: grid.y - 22,
+          style: {
+            text: "Today",
+            fill: "#000",
+            font: "bold 12px Arial",
+            textAlign: "center"
+          },
+          silent: true
+        }
       ]
     });
   }
@@ -130,3 +128,78 @@ function renderElevationChart(containerId, payload) {
   elevationChartInstance.on("finished", drawTodayLine);
   drawTodayLine();
 }
+
+// ==============================
+// GRAPH 2 — 24MS
+// ==============================
+
+const monthSelect = document.getElementById("g2-month");
+const variableSelect = document.getElementById("g2-variable");
+
+async function load24MSMonths() {
+  const response = await fetch("/api/24ms/months");
+  const months = await response.json();
+
+  monthSelect.innerHTML = "";
+
+  months.reverse().forEach(month => {
+    const option = document.createElement("option");
+    option.value = month;
+    option.textContent = month;
+    monthSelect.appendChild(option);
+  });
+
+  if (months.length > 0) {
+    load24MSData();
+  }
+}
+
+async function load24MSData() {
+  const dam = getActiveDam();
+  const variable = variableSelect.value;
+  const month = monthSelect.value;
+
+  if (!month) return;
+
+  const url = `/api/24ms?dam=${dam}&variable=${variable}&month=${encodeURIComponent(month)}`;
+  const response = await fetch(url);
+  const payload = await response.json();
+
+  if (!payload.traces) return;
+
+  if (!chart24msInstance) {
+    chart24msInstance = echarts.init(document.getElementById("chart24ms"));
+    window.addEventListener("resize", () => chart24msInstance.resize());
+  }
+
+  const series = payload.traces.map(trace => ({
+    name: trace.name,
+    type: "line",
+    smooth: true,
+    showSymbol: false,
+    data: trace.data
+  }));
+
+  chart24msInstance.setOption({
+    tooltip: { trigger: "axis" },
+    legend: { top: 10 },
+    xAxis: { type: "time" },
+    yAxis: { type: "value", scale: true },
+    series: series
+  }, true);
+}
+
+variableSelect.addEventListener("change", load24MSData);
+monthSelect.addEventListener("change", load24MSData);
+
+document.querySelectorAll(".tab-button").forEach(btn => {
+  btn.addEventListener("click", function () {
+    document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+    this.classList.add("active");
+    document.getElementById("activeDam").textContent = this.textContent;
+    load24MSData();
+  });
+});
+
+// Initial load
+load24MSMonths();
