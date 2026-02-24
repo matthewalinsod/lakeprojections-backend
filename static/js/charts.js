@@ -138,90 +138,132 @@ function drawTodayLine(cutoverMs) {
 // GRAPH 2 — 24MS
 // ==============================
 
-let monthSelect;
-let variableSelect;
+let chart24msInstance = null;
 
-function initialize24MS() {
+function getActiveDam() {
+  const activeTab = document.querySelector(".tab-button.active");
+  return activeTab ? activeTab.dataset.dam : "hoover";
+}
 
-  monthSelect = document.getElementById("g2-month");
-  variableSelect = document.getElementById("g2-variable");
+function getSdIdForDam(dam, variable) {
+  const map = {
+    hoover: {
+      elevation: 1930,
+      release: 1863,
+      energy: 2070
+    },
+    davis: {
+      elevation: 2100,
+      release: 2166,
+      energy: 2071
+    },
+    parker: {
+      elevation: 2101,
+      release: 2146,
+      energy: 2072
+    }
+  };
+
+  return map[dam][variable];
+}
+
+async function initialize24MS() {
+
+  const monthSelect = document.getElementById("g2-month");
+  const variableSelect = document.getElementById("g2-variable");
 
   if (!monthSelect || !variableSelect) return;
 
-  variableSelect.addEventListener("change", load24MSData);
-  monthSelect.addEventListener("change", load24MSData);
-
-  document.querySelectorAll(".tab-button").forEach(btn => {
-    btn.addEventListener("click", function () {
-      document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
-      this.classList.add("active");
-      document.getElementById("activeDam").textContent = this.textContent;
-      load24MSData();
-    });
-  });
-
-  load24MSMonths();
-}
-
-async function load24MSMonths() {
   try {
     const response = await fetch("/api/24ms/months");
     const months = await response.json();
 
-    monthSelect.innerHTML = "";
+    if (!months || months.length === 0) return;
 
-    months.reverse().forEach(month => {
+    // Sort newest first
+    months.sort().reverse();
+
+    // Default to most recent
+    const latestMonth = months[0];
+
+    // Populate dropdown
+    monthSelect.innerHTML = "";
+    months.forEach(month => {
       const option = document.createElement("option");
       option.value = month;
       option.textContent = month;
       monthSelect.appendChild(option);
     });
 
-    if (months.length > 0) {
-      load24MSData();
-    }
+    monthSelect.value = latestMonth;
 
-  } catch (error) {
-    console.error("Error loading 24MS months:", error);
+    // Render initial chart
+    await load24MSData(latestMonth);
+
+    // Event listeners
+    variableSelect.addEventListener("change", () => {
+      load24MSData(monthSelect.value);
+    });
+
+    monthSelect.addEventListener("change", () => {
+      load24MSData(monthSelect.value);
+    });
+
+  } catch (err) {
+    console.error("24MS initialization failed:", err);
   }
 }
 
-async function load24MSData() {
-  try {
-    const dam = getActiveDam();
-    const variable = variableSelect.value;
-    const month = monthSelect.value;
+async function load24MSData(month) {
 
-    if (!month) return;
+  const dam = getActiveDam();
+  const variable = document.getElementById("g2-variable").value;
 
-    const url = `/api/24ms?dam=${dam}&variable=${variable}&month=${encodeURIComponent(month)}`;
-    const response = await fetch(url);
-    const payload = await response.json();
+  const url = `/api/24ms?dam=${dam}&variable=${variable}&month=${encodeURIComponent(month)}`;
 
-    if (!payload.traces) return;
+  const response = await fetch(url);
+  const payload = await response.json();
 
-    if (!chart24msInstance) {
-      chart24msInstance = echarts.init(document.getElementById("chart24ms"));
-      window.addEventListener("resize", () => chart24msInstance.resize());
-    }
+  if (!payload.traces) return;
 
-    const series = payload.traces.map(trace => ({
-      name: trace.name,
-      type: "line",
-      smooth: true,
-      showSymbol: false,
-      data: trace.data
-    }));
-
-    chart24msInstance.setOption({
-      tooltip: { trigger: "axis" },
-      legend: { top: 10 },
-      xAxis: { type: "time" },
-      yAxis: { type: "value", scale: true },
-      series: series
-    }, true);
-
-  } catch (error) {
-    console.error("Error loading 24MS data:", error);
+  if (!chart24msInstance) {
+    chart24msInstance = echarts.init(document.getElementById("chart24ms"));
+    window.addEventListener("resize", () => chart24msInstance.resize());
   }
+
+  const series = payload.traces.map(trace => ({
+    name: trace.name,
+    type: "line",
+    smooth: true,
+    showSymbol: false,
+    data: trace.data
+  }));
+
+  chart24msInstance.setOption({
+    animation: false,
+    tooltip: { trigger: "axis" },
+    legend: { top: 10 },
+    xAxis: { type: "time" },
+    yAxis: { type: "value", scale: true },
+    series: series
+  }, true);
 }
+
+// Wait for DOM
+document.addEventListener("DOMContentLoaded", function () {
+  initialize24MS();
+});
+
+// Reload when dam tab changes
+document.querySelectorAll(".tab-button").forEach(btn => {
+  btn.addEventListener("click", function () {
+    document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+    this.classList.add("active");
+    document.getElementById("activeDam").textContent = this.textContent;
+
+    const selectedMonth = document.getElementById("g2-month").value;
+    if (selectedMonth) {
+      load24MSData(selectedMonth);
+    }
+  });
+});
