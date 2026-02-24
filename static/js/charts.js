@@ -1,12 +1,11 @@
 let elevationChartInstance = null;
 
 function isoToMs(iso) {
-  // iso like "2026-02-24T00:00:00"
-  return new Date(iso).getTime(); // treat as 
+  // Interpret timestamps exactly as stored (no forced UTC)
+  return new Date(iso).getTime();
 }
 
 function buildSeriesPoints(rows) {
-  // rows: [{t, v}]
   return rows
     .filter(r => r.t && r.v !== null && r.v !== undefined)
     .map(r => [isoToMs(r.t), Number(r.v)]);
@@ -22,31 +21,39 @@ function renderElevationChart(containerId, payload) {
   }
 
   const historic = buildSeriesPoints(payload.historic || []);
-let forecast = buildSeriesPoints(payload.forecast || []);
-const todayMs = isoToMs(payload.cutover);
+  let forecast = buildSeriesPoints(payload.forecast || []);
+  const cutoverMs = isoToMs(payload.cutover);
 
-// Stitch forecast so it touches historic
-if (payload.last_historic && payload.last_historic.t && payload.last_historic.v !== null) {
-  const stitchPoint = [
-    isoToMs(payload.last_historic.t),
-    Number(payload.last_historic.v)
-  ];
+  // --- Stitch forecast to historic ---
+  if (payload.last_historic && payload.last_historic.t && payload.last_historic.v !== null) {
+    const stitchPoint = [
+      isoToMs(payload.last_historic.t),
+      Number(payload.last_historic.v)
+    ];
 
-  if (forecast.length === 0 || forecast[0][0] !== stitchPoint[0]) {
-    forecast = [stitchPoint, ...forecast];
+    if (forecast.length === 0 || forecast[0][0] !== stitchPoint[0]) {
+      forecast = [stitchPoint, ...forecast];
+    }
   }
-}
 
   const option = {
     animation: false,
-    grid: { left: 50, right: 20, top: 30, bottom: 35 },
+    grid: { left: 60, right: 20, top: 50, bottom: 40 },
     tooltip: {
       trigger: "axis",
       axisPointer: { type: "cross" }
     },
+    legend: {
+      top: 10
+    },
     xAxis: {
       type: "time",
-      axisLabel: { hideOverlap: true }
+      axisLabel: {
+        formatter: function (value) {
+          const d = new Date(value);
+          return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+        }
+      }
     },
     yAxis: {
       type: "value",
@@ -67,45 +74,48 @@ if (payload.last_historic && payload.last_historic.t && payload.last_historic.v 
         data: forecast,
         lineStyle: { width: 2, type: "dashed" }
       }
-    ],
-    // Vertical black line at today
-    graphic: [
-      {
-        type: "line",
-        // Convert today x value into pixel coordinate via convertToPixel
-        // We set placeholder; we'll update after setOption using resize handler below.
-        shape: { x1: 0, y1: 0, x2: 0, y2: 0 },
-        style: { stroke: "#000", lineWidth: 2 },
-        silent: true
-      }
     ]
   };
 
   elevationChartInstance.setOption(option, true);
 
-  // Draw "today" line precisely (after chart lays out)
-  const updateTodayLine = () => {
-    if (!elevationChartInstance) return;
-    const x = elevationChartInstance.convertToPixel({ xAxisIndex: 0 }, todayMs);
-    const top = elevationChartInstance.convertToPixel({ yAxisIndex: 0 }, elevationChartInstance.getOption().yAxis[0].max ?? 0);
-    const bottom = elevationChartInstance.convertToPixel({ yAxisIndex: 0 }, elevationChartInstance.getOption().yAxis[0].min ?? 0);
-
-    // If convertToPixel returns NaN (rare), fall back to grid bounds
+  // --- Draw Today vertical line + label ---
+  function drawTodayLine() {
+    const xPixel = elevationChartInstance.convertToPixel({ xAxisIndex: 0 }, cutoverMs);
     const grid = elevationChartInstance.getModel().getComponent("grid").coordinateSystem.getRect();
-    const y1 = isFinite(top) ? top : grid.y;
-    const y2 = isFinite(bottom) ? bottom : (grid.y + grid.height);
 
     elevationChartInstance.setOption({
-      graphic: [{
-        type: "line",
-        shape: { x1: x, y1: grid.y, x2: x, y2: grid.y + grid.height },
-        style: { stroke: "#000", lineWidth: 2 },
-        silent: true
-      }]
+      graphic: [
+        {
+          type: "line",
+          shape: {
+            x1: xPixel,
+            y1: grid.y,
+            x2: xPixel,
+            y2: grid.y + grid.height
+          },
+          style: {
+            stroke: "#000",
+            lineWidth: 2
+          },
+          silent: true
+        },
+        {
+          type: "text",
+          left: xPixel + 4,
+          top: grid.y - 20,
+          style: {
+            text: "Today",
+            fill: "#000",
+            font: "bold 12px Arial"
+          },
+          silent: true
+        }
+      ]
     });
-  };
+  }
 
-  updateTodayLine();
   elevationChartInstance.off("finished");
-  elevationChartInstance.on("finished", updateTodayLine);
+  elevationChartInstance.on("finished", drawTodayLine);
+  drawTodayLine();
 }
