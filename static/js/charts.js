@@ -138,8 +138,6 @@ function drawTodayLine(cutoverMs) {
 // GRAPH 2 — 24MS
 // ==============================
 
-let chart24msInstance = null;
-
 function getActiveDam() {
   const activeTab = document.querySelector(".tab-button.active");
   return activeTab ? activeTab.dataset.dam : "hoover";
