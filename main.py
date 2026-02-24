@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 import sqlite3
 import os
 import requests
+import time
 from datetime import datetime, timedelta
 from flask import render_template
 
@@ -20,6 +21,67 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# ==============================
+# DATABASE ADD INDEX
+# ==============================
+
+def ensure_indexes(conn):
+    """
+    Create indexes for faster time-series reads.
+    Safe to run repeatedly because we use IF NOT EXISTS.
+    """
+    conn.executescript("""
+    -- =========================
+    -- HISTORIC DAILY
+    -- =========================
+    CREATE INDEX IF NOT EXISTS idx_historic_daily_dt
+        ON historic_daily_data (historic_datetime);
+
+    CREATE INDEX IF NOT EXISTS idx_historic_daily_sdid_dt
+        ON historic_daily_data (sd_id, historic_datetime);
+
+    -- =========================
+    -- HISTORIC HOURLY
+    -- =========================
+    CREATE INDEX IF NOT EXISTS idx_historic_hourly_dt
+        ON historic_hourly_data (historic_datetime);
+
+    CREATE INDEX IF NOT EXISTS idx_historic_hourly_sdid_dt
+        ON historic_hourly_data (sd_id, historic_datetime);
+
+    -- =========================
+    -- FORECASTED DAILY
+    -- =========================
+    CREATE INDEX IF NOT EXISTS idx_forecasted_daily_dt
+        ON forecasted_daily_data (forecasted_datetime);
+
+    CREATE INDEX IF NOT EXISTS idx_forecasted_daily_sdid_dt
+        ON forecasted_daily_data (sd_id, forecasted_datetime);
+
+    CREATE INDEX IF NOT EXISTS idx_forecasted_daily_accessed
+        ON forecasted_daily_data (datetime_accessed);
+
+    -- =========================
+    -- FORECASTED HOURLY
+    -- =========================
+    CREATE INDEX IF NOT EXISTS idx_forecasted_hourly_dt
+        ON forecasted_hourly_data (forecasted_datetime);
+
+    CREATE INDEX IF NOT EXISTS idx_forecasted_hourly_sdid_dt
+        ON forecasted_hourly_data (sd_id, forecasted_datetime);
+
+    CREATE INDEX IF NOT EXISTS idx_forecasted_hourly_accessed
+        ON forecasted_hourly_data (datetime_accessed);
+
+    -- =========================
+    -- FORECASTED 24-MONTH STUDY
+    -- =========================
+    CREATE INDEX IF NOT EXISTS idx_forecasted_24ms_mrid_sdid_dt
+        ON forecasted_24ms_data (mr_id, sd_id, forecasted_datetime);
+
+    CREATE INDEX IF NOT EXISTS idx_forecasted_24ms_dt
+        ON forecasted_24ms_data (forecasted_datetime);
+    """)
 
 # ==============================
 # SECURITY CHECK
@@ -43,7 +105,24 @@ def dashboard():
 def health():
     return "OK", 200
 
+@app.route("/internal/db/indexes", methods=["POST"])
+def create_db_indexes():
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
 
+    t0 = time.time()
+
+    conn = get_db_connection()
+    try:
+        ensure_indexes(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({
+        "status": "indexes ensured",
+        "elapsed_seconds": round(time.time() - t0, 3)
+    })
 # ==============================
 # HISTORIC DAILY UPDATE
 # ==============================
