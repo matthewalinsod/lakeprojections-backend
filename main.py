@@ -229,6 +229,161 @@ def api_elevation():
     })
 
 # ==============================
+# 24 MONTH STUDY (24MS) API
+# ==============================
+
+# Hardcoded SDID map
+SDID_MAP = {
+    "hoover": {
+        "elevation": 1930,
+        "release": 1863,
+        "energy": 2070
+    },
+    "davis": {
+        "elevation": 2100,
+        "release": 2166,
+        "energy": 2071
+    },
+    "parker": {
+        "elevation": 2101,
+        "release": 2146,
+        "energy": 2072
+    }
+}
+
+
+# --------------------------------
+# Get Available 24MS Months
+# --------------------------------
+@app.route("/api/24ms/months", methods=["GET"])
+def get_24ms_months():
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT
+            substr(run_name, 1, instr(run_name, ' 24MS') - 1) AS month_label
+        FROM mrid_mapping
+        WHERE run_name LIKE '%24MS%'
+        ORDER BY month_label
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    months = [row["month_label"] for row in rows if row["month_label"]]
+
+    return jsonify(months)
+
+# --------------------------------
+# Get 24MS Data
+# --------------------------------
+@app.route("/api/24ms", methods=["GET"])
+def get_24ms_data():
+
+    dam = request.args.get("dam", "").lower()
+    variable = request.args.get("variable", "").lower()
+    month = request.args.get("month", "")
+
+    if dam not in SDID_MAP:
+        return jsonify({"error": "Invalid dam"}), 400
+
+    if variable not in SDID_MAP[dam]:
+        return jsonify({"error": "Invalid variable"}), 400
+
+    if not month:
+        return jsonify({"error": "Month required"}), 400
+
+    sd_id = SDID_MAP[dam][variable]
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Get MRIDs for selected month
+    cursor.execute("""
+        SELECT mr_id, run_name
+        FROM mrid_mapping
+        WHERE run_name LIKE ?
+    """, (f"{month} 24MS%",))
+
+    mr_rows = cursor.fetchall()
+
+    if not mr_rows:
+        conn.close()
+        return jsonify({"error": "No runs found for month"}), 404
+
+    mrid_to_label = {}
+
+    for row in mr_rows:
+        run_name = row["run_name"]
+
+        if "Min" in run_name:
+            label = "Min"
+        elif "Most" in run_name:
+            label = "Most"
+        elif "Max" in run_name:
+            label = "Max"
+        else:
+            continue
+
+        mrid_to_label[row["mr_id"]] = label
+
+    mr_ids = list(mrid_to_label.keys())
+
+    if not mr_ids:
+        conn.close()
+        return jsonify({"error": "No valid scenarios found"}), 404
+
+    placeholders = ",".join("?" for _ in mr_ids)
+
+    query = f"""
+        SELECT forecasted_datetime, value, mr_id
+        FROM forecasted_24ms_data
+        WHERE sd_id = ?
+        AND mr_id IN ({placeholders})
+        ORDER BY forecasted_datetime
+    """
+
+    cursor.execute(query, [sd_id] + mr_ids)
+
+    data_rows = cursor.fetchall()
+    conn.close()
+
+    # Group data by mr_id
+    traces = {}
+
+    for row in data_rows:
+        mr_id = row["mr_id"]
+        label = mrid_to_label.get(mr_id)
+
+        if not label:
+            continue
+
+        if label not in traces:
+            traces[label] = []
+
+        traces[label].append([
+            row["forecasted_datetime"],
+            row["value"]
+        ])
+
+    formatted_traces = []
+
+    for label, data in traces.items():
+        formatted_traces.append({
+            "name": label,
+            "data": data
+        })
+
+    return jsonify({
+        "dam": dam,
+        "variable": variable,
+        "month": month,
+        "traces": formatted_traces
+    })
+
+# ==============================
 # HISTORIC DAILY UPDATE
 # ==============================
 
