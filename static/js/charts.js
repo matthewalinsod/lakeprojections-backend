@@ -22,8 +22,20 @@ function renderElevationChart(containerId, payload) {
   }
 
   const historic = buildSeriesPoints(payload.historic || []);
-  const forecast = buildSeriesPoints(payload.forecast || []);
-  const todayMs = isoToMs(payload.today_line);
+let forecast = buildSeriesPoints(payload.forecast || []);
+const todayMs = isoToMs(payload.cutover);
+
+// Stitch forecast so it touches historic
+if (payload.last_historic && payload.last_historic.t && payload.last_historic.v !== null) {
+  const stitchPoint = [
+    isoToMs(payload.last_historic.t),
+    Number(payload.last_historic.v)
+  ];
+
+  if (forecast.length === 0 || forecast[0][0] !== stitchPoint[0]) {
+    forecast = [stitchPoint, ...forecast];
+  }
+}
 
   const option = {
     animation: false,
