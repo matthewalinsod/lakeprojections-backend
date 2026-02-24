@@ -14,24 +14,41 @@
 
 <div class="dashboard-grid">
 
+    <!-- GRAPH 1 -->
     <div class="card">
-  <div class="card-header">
-    <h3>Elevation (Historic + Forecast)</h3>
+        <div class="card-header">
+            <h3>Elevation (Historic + Forecast)</h3>
 
-    <div class="range-buttons" id="rangeButtons">
-      <button class="range-btn active" data-range="30d">MTD</button>
-      <button class="range-btn" data-range="90d">3M</button>
-      <button class="range-btn" data-range="365d">YTD</button>
-      <button class="range-btn" data-range="5y">5Y</button>
+            <div class="range-buttons" id="rangeButtons">
+                <button class="range-btn active" data-range="30d">MTD</button>
+                <button class="range-btn" data-range="90d">3M</button>
+                <button class="range-btn" data-range="365d">YTD</button>
+                <button class="range-btn" data-range="5y">5Y</button>
+            </div>
+        </div>
+
+        <div id="chartElevation" class="chart"></div>
     </div>
-  </div>
 
-  <div id="chartElevation" class="chart"></div>
-</div>
-
+    <!-- GRAPH 2 -->
     <div class="card">
-        <h3>24 Month Study Elevation</h3>
-        <div class="chart-placeholder">Chart 2</div>
+        <div class="card-header">
+            <h3>24 Month Study</h3>
+
+            <div class="graph-controls">
+                <select id="g2-variable">
+                    <option value="elevation">Elevation</option>
+                    <option value="release">Release</option>
+                    <option value="energy">Energy</option>
+                </select>
+
+                <select id="g2-month">
+                    <option>Loading...</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="chart24ms" class="chart"></div>
     </div>
 
     <div class="card">
