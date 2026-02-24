@@ -2,6 +2,15 @@ let elevationChartInstance = null;
 let chart24msInstance = null;
 
 // ==============================
+// WAIT UNTIL DOM IS READY
+// ==============================
+
+document.addEventListener("DOMContentLoaded", function () {
+
+  initialize24MS();
+});
+
+// ==============================
 // UTILITIES
 // ==============================
 
@@ -26,7 +35,7 @@ function getActiveDam() {
 
 function renderElevationChart(containerId, payload) {
   const el = document.getElementById(containerId);
-  if (!el) return;
+  if (!el || !payload) return;
 
   if (!elevationChartInstance) {
     elevationChartInstance = echarts.init(el);
@@ -37,24 +46,22 @@ function renderElevationChart(containerId, payload) {
   let forecast = buildSeriesPoints(payload.forecast || []);
   const cutoverMs = isoToMs(payload.cutover);
 
+  // Stitch forecast to historic
   if (payload.last_historic && payload.last_historic.t && payload.last_historic.v !== null) {
     const stitchPoint = [
       isoToMs(payload.last_historic.t),
       Number(payload.last_historic.v)
     ];
 
-    if (forecast.length === 0 || forecast[0][0] !== stitchPoint[0]) {
+    if (!forecast.length || forecast[0][0] !== stitchPoint[0]) {
       forecast = [stitchPoint, ...forecast];
     }
   }
 
-  const option = {
+  elevationChartInstance.setOption({
     animation: false,
     grid: { left: 60, right: 20, top: 50, bottom: 40 },
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "cross" }
-    },
+    tooltip: { trigger: "axis", axisPointer: { type: "cross" } },
     legend: { top: 10 },
     xAxis: {
       type: "time",
@@ -67,10 +74,7 @@ function renderElevationChart(containerId, payload) {
       },
       splitNumber: 6
     },
-    yAxis: {
-      type: "value",
-      scale: true
-    },
+    yAxis: { type: "value", scale: true },
     series: [
       {
         name: "Historic",
@@ -87,119 +91,137 @@ function renderElevationChart(containerId, payload) {
         lineStyle: { width: 2, type: "dashed" }
       }
     ]
-  };
+  }, true);
 
-  elevationChartInstance.setOption(option, true);
+  drawTodayLine(cutoverMs);
+}
 
-  function drawTodayLine() {
-    const xPixel = elevationChartInstance.convertToPixel({ xAxisIndex: 0 }, cutoverMs);
-    const grid = elevationChartInstance.getModel().getComponent("grid").coordinateSystem.getRect();
+function drawTodayLine(cutoverMs) {
+  if (!elevationChartInstance) return;
 
-    elevationChartInstance.setOption({
-      graphic: [
-        {
-          type: "line",
-          shape: {
-            x1: xPixel,
-            y1: grid.y,
-            x2: xPixel,
-            y2: grid.y + grid.height
-          },
-          style: { stroke: "#000", lineWidth: 2 },
-          silent: true
+  const xPixel = elevationChartInstance.convertToPixel({ xAxisIndex: 0 }, cutoverMs);
+  const grid = elevationChartInstance.getModel()
+    .getComponent("grid")
+    .coordinateSystem.getRect();
+
+  elevationChartInstance.setOption({
+    graphic: [
+      {
+        type: "line",
+        shape: {
+          x1: xPixel,
+          y1: grid.y,
+          x2: xPixel,
+          y2: grid.y + grid.height
         },
-        {
-          type: "text",
-          left: xPixel,
-          top: grid.y - 22,
-          style: {
-            text: "Today",
-            fill: "#000",
-            font: "bold 12px Arial",
-            textAlign: "center"
-          },
-          silent: true
-        }
-      ]
-    });
-  }
-
-  elevationChartInstance.off("finished");
-  elevationChartInstance.on("finished", drawTodayLine);
-  drawTodayLine();
+        style: { stroke: "#000", lineWidth: 2 },
+        silent: true
+      },
+      {
+        type: "text",
+        left: xPixel,
+        top: grid.y - 22,
+        style: {
+          text: "Today",
+          fill: "#000",
+          font: "bold 12px Arial",
+          textAlign: "center",
+          textVerticalAlign: "middle"
+        },
+        silent: true
+      }
+    ]
+  });
 }
 
 // ==============================
 // GRAPH 2 — 24MS
 // ==============================
 
-const monthSelect = document.getElementById("g2-month");
-const variableSelect = document.getElementById("g2-variable");
+let monthSelect;
+let variableSelect;
 
-async function load24MSMonths() {
-  const response = await fetch("/api/24ms/months");
-  const months = await response.json();
+function initialize24MS() {
 
-  monthSelect.innerHTML = "";
+  monthSelect = document.getElementById("g2-month");
+  variableSelect = document.getElementById("g2-variable");
 
-  months.reverse().forEach(month => {
-    const option = document.createElement("option");
-    option.value = month;
-    option.textContent = month;
-    monthSelect.appendChild(option);
+  if (!monthSelect || !variableSelect) return;
+
+  variableSelect.addEventListener("change", load24MSData);
+  monthSelect.addEventListener("change", load24MSData);
+
+  document.querySelectorAll(".tab-button").forEach(btn => {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      document.getElementById("activeDam").textContent = this.textContent;
+      load24MSData();
+    });
   });
 
-  if (months.length > 0) {
-    load24MSData();
+  load24MSMonths();
+}
+
+async function load24MSMonths() {
+  try {
+    const response = await fetch("/api/24ms/months");
+    const months = await response.json();
+
+    monthSelect.innerHTML = "";
+
+    months.reverse().forEach(month => {
+      const option = document.createElement("option");
+      option.value = month;
+      option.textContent = month;
+      monthSelect.appendChild(option);
+    });
+
+    if (months.length > 0) {
+      load24MSData();
+    }
+
+  } catch (error) {
+    console.error("Error loading 24MS months:", error);
   }
 }
 
 async function load24MSData() {
-  const dam = getActiveDam();
-  const variable = variableSelect.value;
-  const month = monthSelect.value;
+  try {
+    const dam = getActiveDam();
+    const variable = variableSelect.value;
+    const month = monthSelect.value;
 
-  if (!month) return;
+    if (!month) return;
 
-  const url = `/api/24ms?dam=${dam}&variable=${variable}&month=${encodeURIComponent(month)}`;
-  const response = await fetch(url);
-  const payload = await response.json();
+    const url = `/api/24ms?dam=${dam}&variable=${variable}&month=${encodeURIComponent(month)}`;
+    const response = await fetch(url);
+    const payload = await response.json();
 
-  if (!payload.traces) return;
+    if (!payload.traces) return;
 
-  if (!chart24msInstance) {
-    chart24msInstance = echarts.init(document.getElementById("chart24ms"));
-    window.addEventListener("resize", () => chart24msInstance.resize());
+    if (!chart24msInstance) {
+      chart24msInstance = echarts.init(document.getElementById("chart24ms"));
+      window.addEventListener("resize", () => chart24msInstance.resize());
+    }
+
+    const series = payload.traces.map(trace => ({
+      name: trace.name,
+      type: "line",
+      smooth: true,
+      showSymbol: false,
+      data: trace.data
+    }));
+
+    chart24msInstance.setOption({
+      tooltip: { trigger: "axis" },
+      legend: { top: 10 },
+      xAxis: { type: "time" },
+      yAxis: { type: "value", scale: true },
+      series: series
+    }, true);
+
+  } catch (error) {
+    console.error("Error loading 24MS data:", error);
   }
-
-  const series = payload.traces.map(trace => ({
-    name: trace.name,
-    type: "line",
-    smooth: true,
-    showSymbol: false,
-    data: trace.data
-  }));
-
-  chart24msInstance.setOption({
-    tooltip: { trigger: "axis" },
-    legend: { top: 10 },
-    xAxis: { type: "time" },
-    yAxis: { type: "value", scale: true },
-    series: series
-  }, true);
 }
-
-variableSelect.addEventListener("change", load24MSData);
-monthSelect.addEventListener("change", load24MSData);
-
-document.querySelectorAll(".tab-button").forEach(btn => {
-  btn.addEventListener("click", function () {
-    document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
-    this.classList.add("active");
-    document.getElementById("activeDam").textContent = this.textContent;
-    load24MSData();
-  });
-});
-
-// Initial load
-load24MSMonths();
