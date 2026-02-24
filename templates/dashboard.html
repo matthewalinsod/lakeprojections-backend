@@ -1,1 +1,44 @@
+{% extends "base.html" %}
 
+{% block content %}
+
+<div class="tabs">
+    <button class="tab-button active" data-dam="hoover">Hoover</button>
+    <button class="tab-button" data-dam="davis">Davis</button>
+    <button class="tab-button" data-dam="parker">Parker</button>
+</div>
+
+<div class="current-dam">
+    Currently Viewing: <span id="activeDam">Hoover</span>
+</div>
+
+<div class="dashboard-grid">
+
+    <div class="card">
+        <h3>Elevation (Historic + Forecast)</h3>
+        <div class="chart-placeholder">Chart 1</div>
+    </div>
+
+    <div class="card">
+        <h3>24 Month Study Elevation</h3>
+        <div class="chart-placeholder">Chart 2</div>
+    </div>
+
+    <div class="card">
+        <h3>Energy (Historic + Forecast)</h3>
+        <div class="chart-placeholder">Chart 3</div>
+    </div>
+
+    <div class="card">
+        <h3>24 Month Study Energy</h3>
+        <div class="chart-placeholder">Chart 4</div>
+    </div>
+
+    <div class="card">
+        <h3>Additional Metric</h3>
+        <div class="chart-placeholder">Chart 5</div>
+    </div>
+
+</div>
+
+{% endblock %}
