@@ -110,16 +110,18 @@ function renderElevationChart(containerId, payload) {
           silent: true
         },
         {
-          type: "text",
-          left: xPixel + 4,
-          top: grid.y - 20,
-          style: {
-            text: "Today",
-            fill: "#000",
-            font: "bold 12px Arial"
-          },
-          silent: true
-        }
+  type: "text",
+  left: xPixel,
+  top: grid.y - 22,
+  style: {
+    text: "Today",
+    fill: "#000",
+    font: "bold 12px Arial",
+    textAlign: "center"
+  },
+  origin: [xPixel, 0],
+  silent: true
+}
       ]
     });
   }
