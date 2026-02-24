@@ -1,21 +1,44 @@
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", () => {
+  const tabButtons = document.querySelectorAll(".tab-button");
+  const activeDamLabel = document.getElementById("activeDam");
 
-    const buttons = document.querySelectorAll(".tab-button");
-    const activeDamLabel = document.getElementById("activeDam");
+  const rangeButtons = document.querySelectorAll(".range-btn");
+  let activeDam = "hoover";
+  let activeRange = "30d"; // MTD default
 
-    buttons.forEach(button => {
-        button.addEventListener("click", function() {
+  function titleCase(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
 
-            buttons.forEach(btn => btn.classList.remove("active"));
-            this.classList.add("active");
+  async function loadElevation() {
+    const payload = await fetchElevationSeries(activeDam, activeRange);
+    renderElevationChart("chartElevation", payload);
+  }
 
-            const selectedDam = this.dataset.dam;
-            activeDamLabel.textContent = selectedDam.charAt(0).toUpperCase() + selectedDam.slice(1);
+  // Tabs
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", async () => {
+      tabButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
 
-            console.log("Active dam changed to:", selectedDam);
+      activeDam = btn.dataset.dam;
+      activeDamLabel.textContent = titleCase(activeDam);
 
-            // Later: call API reload here
-        });
+      await loadElevation();
     });
+  });
 
+  // Range filters
+  rangeButtons.forEach(btn => {
+    btn.addEventListener("click", async () => {
+      rangeButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      activeRange = btn.dataset.range;
+      await loadElevation();
+    });
+  });
+
+  // Initial load
+  loadElevation().catch(err => console.error(err));
 });
