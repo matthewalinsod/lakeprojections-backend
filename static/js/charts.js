@@ -2,7 +2,7 @@ let elevationChartInstance = null;
 
 function isoToMs(iso) {
   // iso like "2026-02-24T00:00:00"
-  return new Date(iso + "Z").getTime(); // treat as UTC
+  return new Date(iso).getTime(); // treat as 
 }
 
 function buildSeriesPoints(rows) {
