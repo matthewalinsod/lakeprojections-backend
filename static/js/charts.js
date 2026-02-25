@@ -198,8 +198,8 @@ async function initialize24MS() {
 
     if (!months || months.length === 0) return;
 
-    // Sort newest → oldest
-    months.sort((a, b) => new Date(b) - new Date(a));
+    // Defensive client-side sort in case API returns unexpected ordering.
+    months.sort((a, b) => parse24MSMonthLabel(b) - parse24MSMonthLabel(a));
 
     monthSelect.innerHTML = "";
 
@@ -225,6 +225,21 @@ async function initialize24MS() {
   } catch (err) {
     console.error("24MS initialization failed:", err);
   }
+}
+
+function parse24MSMonthLabel(label) {
+
+  if (!label) return Number.NEGATIVE_INFINITY;
+
+  const normalizedLabel = String(label).trim();
+  const parsed = Date.parse(`${normalizedLabel} 1`);
+
+  if (!Number.isNaN(parsed)) {
+    return parsed;
+  }
+
+  const fallback = Date.parse(normalizedLabel);
+  return Number.isNaN(fallback) ? Number.NEGATIVE_INFINITY : fallback;
 }
 
 async function load24MSData(month) {

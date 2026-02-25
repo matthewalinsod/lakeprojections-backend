@@ -3,6 +3,7 @@ import sqlite3
 import os
 import requests
 import time
+import re
 from datetime import datetime, timedelta
 from flask import render_template
 
@@ -11,6 +12,46 @@ print("MAIN.PY LOADED")
 DB_PATH = "/data/lakeprojections.db"
 print("DB PATH EXISTS:", os.path.exists(DB_PATH))
 UPDATE_TOKEN = os.environ.get("UPDATE_TOKEN")
+
+
+def _parse_24ms_month_label(month_label):
+    """
+    Parse a 24MS month label into a datetime for stable chronological sorting.
+    Returns None when parsing fails.
+    """
+    if not month_label:
+        return None
+
+    clean_label = month_label.strip()
+
+    known_formats = [
+        "%b %Y",   # Jan 2025
+        "%B %Y",   # January 2025
+        "%Y-%m",   # 2025-01
+        "%Y/%m",   # 2025/01
+        "%m/%Y",   # 01/2025
+    ]
+
+    for fmt in known_formats:
+        try:
+            return datetime.strptime(clean_label, fmt)
+        except ValueError:
+            continue
+
+    # Fallback: extract month name + year anywhere in the label.
+    match = re.search(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+([12]\d{3})", clean_label, re.IGNORECASE)
+    if match:
+        month_text = match.group(1).lower()
+        month_lookup = {
+            "jan": 1, "feb": 2, "mar": 3, "apr": 4,
+            "may": 5, "jun": 6, "jul": 7, "aug": 8,
+            "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12
+        }
+        month_num = month_lookup.get(month_text)
+        if month_num:
+            return datetime(int(match.group(2)), month_num, 1)
+
+    return None
 
 
 # ==============================
@@ -267,13 +308,18 @@ def get_24ms_months():
             substr(run_name, 1, instr(run_name, ' 24MS') - 1) AS month_label
         FROM mrid_mapping
         WHERE run_name LIKE '%24MS%'
-        ORDER BY month_label
     """)
 
     rows = cursor.fetchall()
     conn.close()
 
     months = [row["month_label"] for row in rows if row["month_label"]]
+
+    # Sort newest -> oldest so Chart #2 defaults to the most recent study.
+    months.sort(
+        key=lambda label: _parse_24ms_month_label(label) or datetime.min,
+        reverse=True
+    )
 
     return jsonify(months)
 
