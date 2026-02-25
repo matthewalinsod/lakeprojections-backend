@@ -142,7 +142,7 @@ function drawTodayLine(cutoverMs) {
       },
       {
         type: "text",
-        left: xPixel - 8,
+        left: xPixel - 40,
         top: grid.y - 10,
         style: {
           text: "HISTORIC",
