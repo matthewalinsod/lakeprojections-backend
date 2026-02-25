@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 from flask import render_template
 
 app = Flask(__name__)
-
+print("MAIN.PY LOADED")
 DB_PATH = "/data/lakeprojections.db"
+print("DB PATH EXISTS:", os.path.exists(DB_PATH))
 UPDATE_TOKEN = os.environ.get("UPDATE_TOKEN")
 
 
