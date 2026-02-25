@@ -49,7 +49,7 @@ function renderElevationChart(containerId, payload) {
   let forecast = buildSeriesPoints(payload.forecast || []);
 
   // 🔥 Remove forecast values BEFORE today
-  forecast = forecast.filter(point => point[0] >= cutoverMs);
+  forecast = forecast.filter(point => point[0] > cutoverMs);
 
   // Stitch forecast to historic
   if (
