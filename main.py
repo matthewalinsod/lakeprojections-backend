@@ -763,33 +763,38 @@ def update_forecast():
     })
 
 #debug section
-@app.route("/debug/historic/check")
-def debug_check_specific():
+@app.route("/debug/sql", methods=["POST"])
+def debug_sql():
 
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
 
-    date = request.args.get("date")
-    sd_id = request.args.get("sd_id")
+    data = request.get_json()
+    if not data or "query" not in data:
+        return jsonify({"error": "Provide SQL query"}), 400
 
-    if not date or not sd_id:
-        return jsonify({"error": "Provide date and sd_id"}), 400
+    query = data["query"].strip().lower()
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    # Only allow SELECT statements
+    if not query.startswith("select"):
+        return jsonify({"error": "Only SELECT queries allowed"}), 400
 
-    cursor.execute("""
-        SELECT historic_datetime, sd_id, value
-        FROM historic_daily_data
-        WHERE sd_id = ?
-        AND substr(historic_datetime, 1, 10) = ?
-        ORDER BY historic_datetime
-    """, (sd_id, date))
+    # Block dangerous keywords
+    forbidden = ["drop", "delete", "update", "insert", "alter", "pragma", "attach"]
+    if any(word in query for word in forbidden):
+        return jsonify({"error": "Forbidden SQL keyword detected"}), 400
 
-    rows = cursor.fetchall()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(data["query"])
+        rows = cursor.fetchall()
+        conn.close()
 
-    return jsonify([dict(row) for row in rows])
+        return jsonify([dict(row) for row in rows])
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ==============================
 # RENDER PORT BIND
