@@ -270,6 +270,128 @@ def api_elevation():
         }
     })
 
+
+
+# API release hourly for Chart 3 (Davis/Parker)
+@app.route("/api/release/hourly/dates", methods=["GET"])
+def api_release_hourly_dates():
+    dam = (request.args.get("dam") or "").lower().strip()
+
+    dam_to_sdid = {
+        "davis": 2166,
+        "parker": 2146
+    }
+
+    if dam not in dam_to_sdid:
+        return jsonify({"error": "Chart 3 is only available for Davis and Parker"}), 400
+
+    sd_id = dam_to_sdid[dam]
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT substr(historic_datetime, 1, 10) AS dt
+        FROM historic_hourly_data
+        WHERE sd_id = ?
+        UNION
+        SELECT DISTINCT substr(forecasted_datetime, 1, 10) AS dt
+        FROM forecasted_hourly_data
+        WHERE sd_id = ?
+        ORDER BY dt ASC
+    """, (sd_id, sd_id))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    dates = [row["dt"] for row in rows if row["dt"]]
+
+    return jsonify({
+        "dam": dam,
+        "dates": dates
+    })
+
+
+@app.route("/api/release/hourly", methods=["GET"])
+def api_release_hourly():
+    dam = (request.args.get("dam") or "").lower().strip()
+    selected_date = (request.args.get("date") or "").strip()
+
+    dam_to_sdid = {
+        "davis": 2166,
+        "parker": 2146
+    }
+
+    if dam not in dam_to_sdid:
+        return jsonify({"error": "Chart 3 is only available for Davis and Parker"}), 400
+
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", selected_date):
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+
+    sd_id = dam_to_sdid[dam]
+    day_start = f"{selected_date}T00:00:00"
+    day_end = f"{selected_date}T23:59:59"
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT MAX(datetime_accessed)
+        FROM forecasted_hourly_data
+        WHERE sd_id = ?
+    """, (sd_id,))
+    latest_accessed = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT historic_datetime, value
+        FROM historic_hourly_data
+        WHERE sd_id = ?
+          AND historic_datetime >= ?
+          AND historic_datetime <= ?
+        ORDER BY historic_datetime ASC
+    """, (sd_id, day_start, day_end))
+    historic_rows = cursor.fetchall()
+
+    forecast_rows = []
+    if latest_accessed:
+        cursor.execute("""
+            SELECT forecasted_datetime, value
+            FROM forecasted_hourly_data
+            WHERE sd_id = ?
+              AND datetime_accessed = ?
+              AND forecasted_datetime >= ?
+              AND forecasted_datetime <= ?
+            ORDER BY forecasted_datetime ASC
+        """, (sd_id, latest_accessed, day_start, day_end))
+        forecast_rows = cursor.fetchall()
+
+    conn.close()
+
+    historic = [
+        {
+            "t": row["historic_datetime"],
+            "hour": int(row["historic_datetime"][11:13]),
+            "v": row["value"]
+        }
+        for row in historic_rows
+    ]
+
+    forecast = [
+        {
+            "t": row["forecasted_datetime"],
+            "hour": int(row["forecasted_datetime"][11:13]),
+            "v": row["value"]
+        }
+        for row in forecast_rows
+    ]
+
+    return jsonify({
+        "dam": dam,
+        "date": selected_date,
+        "historic": historic,
+        "forecast": forecast
+    })
+
 # ==============================
 # 24 MONTH STUDY (24MS) API
 # ==============================

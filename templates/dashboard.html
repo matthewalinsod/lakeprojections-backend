@@ -52,8 +52,16 @@
 </div>
 
     <div class="card">
-        <h3>Energy (Historic + Forecast)</h3>
-        <div class="chart-placeholder">Chart 3</div>
+        <div class="card-header">
+            <h3>Release by Hour (CFS)</h3>
+
+            <div class="graph-controls">
+                <input type="date" id="g3-date" aria-label="Select release date">
+            </div>
+        </div>
+
+        <div id="chartReleaseHourly" class="chart"></div>
+        <div id="g3-message" class="chart-note"></div>
     </div>
 
     <div class="card">
