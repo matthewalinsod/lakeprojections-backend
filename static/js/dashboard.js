@@ -15,6 +15,11 @@ document.addEventListener("DOMContentLoaded", () => {
     renderElevationChart("chartElevation", payload);
   }
 
+  async function loadReleaseHourly() {
+    if (typeof initializeReleaseHourlyChart !== "function") return;
+    await initializeReleaseHourlyChart(activeDam);
+  }
+
   // Tabs
   tabButtons.forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -25,6 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
       activeDamLabel.textContent = titleCase(activeDam);
 
       await loadElevation();
+      await loadReleaseHourly();
     });
   });
 
@@ -40,5 +46,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Initial load
-  loadElevation().catch(err => console.error(err));
+  Promise.all([
+    loadElevation(),
+    loadReleaseHourly()
+  ]).catch(err => console.error(err));
 });

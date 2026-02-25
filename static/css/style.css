@@ -96,6 +96,32 @@ body {
   border-radius: 6px;
 }
 
+.graph-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#g3-date {
+  padding: 6px 8px;
+  border: 1px solid #c8d0dc;
+  border-radius: 4px;
+  font-size: 13px;
+  background-color: #fff;
+}
+
+#g3-date:disabled {
+  background-color: #e9edf2;
+  color: #808080;
+}
+
+.chart-note {
+  margin-top: 8px;
+  min-height: 18px;
+  color: #5f6b7a;
+  font-size: 13px;
+}
+
 /* Mobile */
 @media (max-width: 900px) {
     .dashboard-grid {

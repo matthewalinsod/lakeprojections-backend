@@ -1,5 +1,8 @@
 let elevationChartInstance = null;
 let chart24msInstance = null;
+let chartReleaseHourlyInstance = null;
+let releaseAvailableDates = [];
+let releaseDateSet = new Set();
 
 // ==============================
 // WAIT UNTIL DOM IS READY
@@ -344,5 +347,188 @@ document.querySelectorAll(".tab-button").forEach(btn => {
     if (selectedMonth) {
       load24MSData(selectedMonth);
     }
+
+    initializeReleaseHourlyChart(this.dataset.dam).catch(err =>
+      console.error("Hourly release chart initialization failed:", err)
+    );
   });
 });
+
+
+// ==============================
+// GRAPH 3 — Hourly Release (Davis/Parker)
+// ==============================
+
+function formatHourLabel(hour) {
+  return String(hour);
+}
+
+function normalizeDateInput(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function setReleaseMessage(message) {
+  const note = document.getElementById("g3-message");
+  if (note) note.textContent = message || "";
+}
+
+function updateReleaseDateInputState(dateInput, enabled) {
+  if (!dateInput) return;
+  dateInput.disabled = !enabled;
+
+  if (!enabled) {
+    dateInput.removeAttribute("min");
+    dateInput.removeAttribute("max");
+    return;
+  }
+
+  if (releaseAvailableDates.length) {
+    dateInput.min = releaseAvailableDates[0];
+    dateInput.max = releaseAvailableDates[releaseAvailableDates.length - 1];
+  }
+}
+
+function renderReleaseHourlyChart(payload) {
+  const container = document.getElementById("chartReleaseHourly");
+  if (!container || !payload) return;
+
+  if (!chartReleaseHourlyInstance) {
+    chartReleaseHourlyInstance = echarts.init(container);
+    window.addEventListener("resize", () => chartReleaseHourlyInstance.resize());
+  }
+
+  const hours = Array.from({ length: 24 }, (_, idx) => idx);
+  const hourLabels = hours.map(formatHourLabel);
+
+  const historicMap = new Map((payload.historic || []).map(row => [Number(row.hour), Math.round(Number(row.v))]));
+  const forecastMap = new Map((payload.forecast || []).map(row => [Number(row.hour), Math.round(Number(row.v))]));
+
+  const historicData = hours.map(hour => historicMap.has(hour) ? historicMap.get(hour) : null);
+  const forecastData = hours.map(hour => forecastMap.has(hour) ? forecastMap.get(hour) : null);
+
+  chartReleaseHourlyInstance.setOption({
+    animation: false,
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      valueFormatter: (value) => value === null || value === undefined ? "No data" : `${Math.round(Number(value))} cfs`
+    },
+    legend: { top: 10 },
+    grid: { left: 60, right: 20, top: 50, bottom: 45 },
+    xAxis: {
+      type: "category",
+      name: "Hour Start",
+      nameLocation: "middle",
+      nameGap: 30,
+      data: hourLabels
+    },
+    yAxis: {
+      type: "value",
+      name: "cfs"
+    },
+    series: [
+      {
+        name: "Historic",
+        type: "bar",
+        data: historicData,
+        barCategoryGap: "0%",
+        barGap: "-100%",
+        itemStyle: { color: "#1f78ff" },
+        emphasis: { focus: "series" }
+      },
+      {
+        name: "Forecast",
+        type: "bar",
+        data: forecastData,
+        barCategoryGap: "0%",
+        barGap: "-100%",
+        itemStyle: { color: "#2e8b57" },
+        emphasis: { focus: "series" }
+      }
+    ]
+  }, true);
+}
+
+async function loadReleaseHourlyDataForDate(dam, date) {
+  const payload = await fetchReleaseHourlySeries(dam, date);
+  renderReleaseHourlyChart(payload);
+
+  const formattedDam = dam.charAt(0).toUpperCase() + dam.slice(1);
+  setReleaseMessage(`Showing ${formattedDam} release for ${payload.date}.`);
+}
+
+async function initializeReleaseHourlyChart(dam) {
+  const dateInput = document.getElementById("g3-date");
+  const container = document.getElementById("chartReleaseHourly");
+  if (!dateInput || !container) return;
+
+  if (!["davis", "parker"].includes(dam)) {
+    updateReleaseDateInputState(dateInput, false);
+    dateInput.value = "";
+    releaseAvailableDates = [];
+    releaseDateSet = new Set();
+
+    if (chartReleaseHourlyInstance) {
+      chartReleaseHourlyInstance.clear();
+      chartReleaseHourlyInstance.setOption({
+        xAxis: { show: false },
+        yAxis: { show: false },
+        series: []
+      });
+    }
+
+    setReleaseMessage("Chart 3 is available only for Davis and Parker.");
+    return;
+  }
+
+  const datesPayload = await fetchReleaseHourlyDates(dam);
+  releaseAvailableDates = (datesPayload.dates || []).slice().sort();
+  releaseDateSet = new Set(releaseAvailableDates);
+
+  if (!releaseAvailableDates.length) {
+    updateReleaseDateInputState(dateInput, false);
+    dateInput.value = "";
+
+    if (chartReleaseHourlyInstance) {
+      chartReleaseHourlyInstance.clear();
+    }
+
+    setReleaseMessage("No hourly release data is available for this dam yet.");
+    return;
+  }
+
+  updateReleaseDateInputState(dateInput, true);
+
+  const currentInput = normalizeDateInput(dateInput.value);
+  const selectedDate = releaseDateSet.has(currentInput)
+    ? currentInput
+    : releaseAvailableDates[releaseAvailableDates.length - 1];
+
+  dateInput.value = selectedDate;
+
+  if (!dateInput.dataset.boundReleaseListener) {
+    dateInput.addEventListener("change", async (event) => {
+      const picked = normalizeDateInput(event.target.value);
+
+      if (!releaseDateSet.has(picked)) {
+        event.target.value = releaseAvailableDates[releaseAvailableDates.length - 1] || "";
+        setReleaseMessage("Selected date has no data and cannot be used.");
+        return;
+      }
+
+      const activeDam = getActiveDam();
+      if (!["davis", "parker"].includes(activeDam)) return;
+
+      try {
+        await loadReleaseHourlyDataForDate(activeDam, picked);
+      } catch (error) {
+        console.error("Failed to load hourly release:", error);
+        setReleaseMessage("Unable to load hourly release data.");
+      }
+    });
+    dateInput.dataset.boundReleaseListener = "true";
+  }
+
+  await loadReleaseHourlyDataForDate(dam, selectedDate);
+}
