@@ -102,6 +102,25 @@ body {
   align-items: center;
 }
 
+.g3-day-nav {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c8d0dc;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #3d4b5d;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.g3-day-nav:disabled {
+  cursor: not-allowed;
+  color: #9aa4b2;
+  background: #edf1f6;
+  border-color: #d8dee7;
+}
+
 #g3-date {
   padding: 6px 8px;
   border: 1px solid #c8d0dc;

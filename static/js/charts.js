@@ -4,6 +4,9 @@ let chartReleaseHourlyInstance = null;
 let releaseAvailableDates = [];
 let releaseDateSet = new Set();
 
+const HISTORIC_SERIES_COLOR = "#1f78ff";
+const FORECAST_SERIES_COLOR = "#2e8b57";
+
 // ==============================
 // WAIT UNTIL DOM IS READY
 // ==============================
@@ -124,8 +127,8 @@ function renderElevationChart(containerId, payload) {
         type: "line",
         showSymbol: false,
         data: historic,
-        lineStyle: { width: 2, color: "#1f78ff" },
-        itemStyle: { color: "#1f78ff" },
+        lineStyle: { width: 2, color: HISTORIC_SERIES_COLOR },
+        itemStyle: { color: HISTORIC_SERIES_COLOR },
         areaStyle: {
           color: "rgba(31, 120, 255, 0.35)"
         }
@@ -135,8 +138,8 @@ function renderElevationChart(containerId, payload) {
         type: "line",
         showSymbol: false,
         data: forecast,
-        lineStyle: { width: 2, type: "dashed", color: "#2e8b57" },
-        itemStyle: { color: "#2e8b57" },
+        lineStyle: { width: 2, type: "dashed", color: FORECAST_SERIES_COLOR },
+        itemStyle: { color: FORECAST_SERIES_COLOR },
         areaStyle: {
           color: "rgba(46, 139, 87, 0.30)"
         }
@@ -180,7 +183,7 @@ function drawTodayLine(cutoverMs) {
         top: grid.y - 10,
         style: {
           text: "HISTORIC",
-          fill: "#1f78ff",
+          fill: HISTORIC_SERIES_COLOR,
           font: "bold 12px Arial",
           textAlign: "right",
           textVerticalAlign: "bottom"
@@ -193,7 +196,7 @@ function drawTodayLine(cutoverMs) {
         top: grid.y - 10,
         style: {
           text: "FORECASTED",
-          fill: "#2e8b57",
+          fill: FORECAST_SERIES_COLOR,
           font: "bold 12px Arial",
           textAlign: "left",
           textVerticalAlign: "bottom"
@@ -373,6 +376,30 @@ function setReleaseMessage(message) {
   if (note) note.textContent = message || "";
 }
 
+function setReleaseNavButtonState(date) {
+  const prevButton = document.getElementById("g3-prev-day");
+  const nextButton = document.getElementById("g3-next-day");
+
+  if (!prevButton || !nextButton) return;
+
+  if (!releaseAvailableDates.length) {
+    prevButton.disabled = true;
+    nextButton.disabled = true;
+    return;
+  }
+
+  const currentIndex = releaseAvailableDates.indexOf(date);
+
+  if (currentIndex === -1) {
+    prevButton.disabled = true;
+    nextButton.disabled = true;
+    return;
+  }
+
+  prevButton.disabled = currentIndex <= 0;
+  nextButton.disabled = currentIndex >= releaseAvailableDates.length - 1;
+}
+
 function updateReleaseDateInputState(dateInput, enabled) {
   if (!dateInput) return;
   dateInput.disabled = !enabled;
@@ -380,6 +407,7 @@ function updateReleaseDateInputState(dateInput, enabled) {
   if (!enabled) {
     dateInput.removeAttribute("min");
     dateInput.removeAttribute("max");
+    setReleaseNavButtonState("");
     return;
   }
 
@@ -387,6 +415,8 @@ function updateReleaseDateInputState(dateInput, enabled) {
     dateInput.min = releaseAvailableDates[0];
     dateInput.max = releaseAvailableDates[releaseAvailableDates.length - 1];
   }
+
+  setReleaseNavButtonState(normalizeDateInput(dateInput.value));
 }
 
 function renderReleaseHourlyChart(payload) {
@@ -434,7 +464,7 @@ function renderReleaseHourlyChart(payload) {
         data: historicData,
         barCategoryGap: "0%",
         barGap: "-100%",
-        itemStyle: { color: "#1f78ff" },
+        itemStyle: { color: HISTORIC_SERIES_COLOR },
         emphasis: { focus: "series" }
       },
       {
@@ -443,7 +473,7 @@ function renderReleaseHourlyChart(payload) {
         data: forecastData,
         barCategoryGap: "0%",
         barGap: "-100%",
-        itemStyle: { color: "#2e8b57" },
+        itemStyle: { color: FORECAST_SERIES_COLOR },
         emphasis: { focus: "series" }
       }
     ]
@@ -454,20 +484,30 @@ async function loadReleaseHourlyDataForDate(dam, date) {
   const payload = await fetchReleaseHourlySeries(dam, date);
   renderReleaseHourlyChart(payload);
 
+  const dateInput = document.getElementById("g3-date");
+  if (dateInput) {
+    dateInput.value = payload.date;
+  }
+
+  setReleaseNavButtonState(payload.date);
+
   const formattedDam = dam.charAt(0).toUpperCase() + dam.slice(1);
   setReleaseMessage(`Showing ${formattedDam} release for ${payload.date}.`);
 }
 
 async function initializeReleaseHourlyChart(dam) {
   const dateInput = document.getElementById("g3-date");
+  const prevButton = document.getElementById("g3-prev-day");
+  const nextButton = document.getElementById("g3-next-day");
   const container = document.getElementById("chartReleaseHourly");
-  if (!dateInput || !container) return;
+  if (!dateInput || !container || !prevButton || !nextButton) return;
 
   if (!["davis", "parker"].includes(dam)) {
     updateReleaseDateInputState(dateInput, false);
     dateInput.value = "";
     releaseAvailableDates = [];
     releaseDateSet = new Set();
+    setReleaseNavButtonState("");
 
     if (chartReleaseHourlyInstance) {
       chartReleaseHourlyInstance.clear();
@@ -494,6 +534,7 @@ async function initializeReleaseHourlyChart(dam) {
       chartReleaseHourlyInstance.clear();
     }
 
+    setReleaseNavButtonState("");
     setReleaseMessage("No hourly release data is available for this dam yet.");
     return;
   }
@@ -514,6 +555,7 @@ async function initializeReleaseHourlyChart(dam) {
       if (!releaseDateSet.has(picked)) {
         event.target.value = releaseAvailableDates[releaseAvailableDates.length - 1] || "";
         setReleaseMessage("Selected date has no data and cannot be used.");
+        setReleaseNavButtonState(normalizeDateInput(event.target.value));
         return;
       }
 
@@ -528,6 +570,46 @@ async function initializeReleaseHourlyChart(dam) {
       }
     });
     dateInput.dataset.boundReleaseListener = "true";
+  }
+
+  if (!prevButton.dataset.boundReleaseListener) {
+    prevButton.addEventListener("click", async () => {
+      const activeDam = getActiveDam();
+      if (!["davis", "parker"].includes(activeDam)) return;
+
+      const current = normalizeDateInput(dateInput.value);
+      const currentIndex = releaseAvailableDates.indexOf(current);
+      if (currentIndex <= 0) return;
+
+      const previousDate = releaseAvailableDates[currentIndex - 1];
+      try {
+        await loadReleaseHourlyDataForDate(activeDam, previousDate);
+      } catch (error) {
+        console.error("Failed to load previous hourly release:", error);
+        setReleaseMessage("Unable to load hourly release data.");
+      }
+    });
+    prevButton.dataset.boundReleaseListener = "true";
+  }
+
+  if (!nextButton.dataset.boundReleaseListener) {
+    nextButton.addEventListener("click", async () => {
+      const activeDam = getActiveDam();
+      if (!["davis", "parker"].includes(activeDam)) return;
+
+      const current = normalizeDateInput(dateInput.value);
+      const currentIndex = releaseAvailableDates.indexOf(current);
+      if (currentIndex === -1 || currentIndex >= releaseAvailableDates.length - 1) return;
+
+      const nextDate = releaseAvailableDates[currentIndex + 1];
+      try {
+        await loadReleaseHourlyDataForDate(activeDam, nextDate);
+      } catch (error) {
+        console.error("Failed to load next hourly release:", error);
+        setReleaseMessage("Unable to load hourly release data.");
+      }
+    });
+    nextButton.dataset.boundReleaseListener = "true";
   }
 
   await loadReleaseHourlyDataForDate(dam, selectedDate);
