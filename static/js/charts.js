@@ -90,14 +90,22 @@ function renderElevationChart(containerId, payload) {
         type: "line",
         showSymbol: false,
         data: historic,
-        lineStyle: { width: 2 }
+        lineStyle: { width: 2, color: "#1f78ff" },
+        itemStyle: { color: "#1f78ff" },
+        areaStyle: {
+          color: "rgba(31, 120, 255, 0.35)"
+        }
       },
       {
         name: "Forecast",
         type: "line",
         showSymbol: false,
         data: forecast,
-        lineStyle: { width: 2, type: "dashed" }
+        lineStyle: { width: 2, type: "dashed", color: "#2e8b57" },
+        itemStyle: { color: "#2e8b57" },
+        areaStyle: {
+          color: "rgba(46, 139, 87, 0.30)"
+        }
       }
     ]
   }, true);
@@ -134,14 +142,27 @@ function drawTodayLine(cutoverMs) {
       },
       {
         type: "text",
-        left: xPixel,
-        top: grid.y - 22,
+        left: xPixel - 8,
+        top: grid.y - 10,
         style: {
-          text: "Today",
-          fill: "#000",
+          text: "HISTORIC",
+          fill: "#1f78ff",
           font: "bold 12px Arial",
-          textAlign: "center",
-          textVerticalAlign: "middle"
+          textAlign: "right",
+          textVerticalAlign: "bottom"
+        },
+        silent: true
+      },
+      {
+        type: "text",
+        left: xPixel + 8,
+        top: grid.y - 10,
+        style: {
+          text: "FORECASTED",
+          fill: "#2e8b57",
+          font: "bold 12px Arial",
+          textAlign: "left",
+          textVerticalAlign: "bottom"
         },
         silent: true
       }
