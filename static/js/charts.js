@@ -6,7 +6,6 @@ let chart24msInstance = null;
 // ==============================
 
 document.addEventListener("DOMContentLoaded", function () {
-
   initialize24MS();
 });
 
@@ -34,6 +33,7 @@ function getActiveDam() {
 // ==============================
 
 function renderElevationChart(containerId, payload) {
+
   const el = document.getElementById(containerId);
   if (!el || !payload) return;
 
@@ -43,14 +43,20 @@ function renderElevationChart(containerId, payload) {
   }
 
   const historic = buildSeriesPoints(payload.historic || []);
-  let forecast = buildSeriesPoints(payload.forecast || []);
 
-// Remove any forecast values before today
-forecast = forecast.filter(point => point[0] >= cutoverMs);
   const cutoverMs = isoToMs(payload.cutover);
 
+  let forecast = buildSeriesPoints(payload.forecast || []);
+
+  // 🔥 Remove forecast values BEFORE today
+  forecast = forecast.filter(point => point[0] >= cutoverMs);
+
   // Stitch forecast to historic
-  if (payload.last_historic && payload.last_historic.t && payload.last_historic.v !== null) {
+  if (
+    payload.last_historic &&
+    payload.last_historic.t &&
+    payload.last_historic.v !== null
+  ) {
     const stitchPoint = [
       isoToMs(payload.last_historic.t),
       Number(payload.last_historic.v)
@@ -72,7 +78,7 @@ forecast = forecast.filter(point => point[0] >= cutoverMs);
         hideOverlap: true,
         formatter: function (value) {
           const d = new Date(value);
-          return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+          return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
         }
       },
       splitNumber: 6
@@ -100,10 +106,16 @@ forecast = forecast.filter(point => point[0] >= cutoverMs);
 }
 
 function drawTodayLine(cutoverMs) {
+
   if (!elevationChartInstance) return;
 
-  const xPixel = elevationChartInstance.convertToPixel({ xAxisIndex: 0 }, cutoverMs);
-  const grid = elevationChartInstance.getModel()
+  const xPixel = elevationChartInstance.convertToPixel(
+    { xAxisIndex: 0 },
+    cutoverMs
+  );
+
+  const grid = elevationChartInstance
+    .getModel()
     .getComponent("grid")
     .coordinateSystem.getRect();
 
@@ -141,28 +153,12 @@ function drawTodayLine(cutoverMs) {
 // GRAPH 2 — 24MS
 // ==============================
 
-function getActiveDam() {
-  const activeTab = document.querySelector(".tab-button.active");
-  return activeTab ? activeTab.dataset.dam : "hoover";
-}
-
 function getSdIdForDam(dam, variable) {
+
   const map = {
-    hoover: {
-      elevation: 1930,
-      release: 1863,
-      energy: 2070
-    },
-    davis: {
-      elevation: 2100,
-      release: 2166,
-      energy: 2071
-    },
-    parker: {
-      elevation: 2101,
-      release: 2146,
-      energy: 2072
-    }
+    hoover: { elevation: 1930, release: 1863, energy: 2070 },
+    davis: { elevation: 2100, release: 2166, energy: 2071 },
+    parker: { elevation: 2101, release: 2146, energy: 2072 }
   };
 
   return map[dam][variable];
@@ -181,14 +177,11 @@ async function initialize24MS() {
 
     if (!months || months.length === 0) return;
 
-    // Sort newest first
-    months.sort().reverse();
+    // Sort newest → oldest
+    months.sort((a, b) => new Date(b) - new Date(a));
 
-    // Default to most recent
-    const latestMonth = months[0];
-
-    // Populate dropdown
     monthSelect.innerHTML = "";
+
     months.forEach(month => {
       const option = document.createElement("option");
       option.value = month;
@@ -196,12 +189,10 @@ async function initialize24MS() {
       monthSelect.appendChild(option);
     });
 
-    monthSelect.value = latestMonth;
+    monthSelect.value = months[0];
 
-    // Render initial chart
-    await load24MSData(latestMonth);
+    await load24MSData(months[0]);
 
-    // Event listeners
     variableSelect.addEventListener("change", () => {
       load24MSData(monthSelect.value);
     });
@@ -228,7 +219,9 @@ async function load24MSData(month) {
   if (!payload.traces) return;
 
   if (!chart24msInstance) {
-    chart24msInstance = echarts.init(document.getElementById("chart24ms"));
+    chart24msInstance = echarts.init(
+      document.getElementById("chart24ms")
+    );
     window.addEventListener("resize", () => chart24msInstance.resize());
   }
 
@@ -250,19 +243,19 @@ async function load24MSData(month) {
   }, true);
 }
 
-// Wait for DOM
-document.addEventListener("DOMContentLoaded", function () {
-  initialize24MS();
-});
-
 // Reload when dam tab changes
 document.querySelectorAll(".tab-button").forEach(btn => {
   btn.addEventListener("click", function () {
-    document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
-    this.classList.add("active");
-    document.getElementById("activeDam").textContent = this.textContent;
+    document.querySelectorAll(".tab-button")
+      .forEach(b => b.classList.remove("active"));
 
-    const selectedMonth = document.getElementById("g2-month").value;
+    this.classList.add("active");
+    document.getElementById("activeDam").textContent =
+      this.textContent;
+
+    const selectedMonth =
+      document.getElementById("g2-month")?.value;
+
     if (selectedMonth) {
       load24MSData(selectedMonth);
     }
