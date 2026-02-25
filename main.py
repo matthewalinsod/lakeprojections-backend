@@ -762,6 +762,34 @@ def update_forecast():
         "range_end": t2
     })
 
+#debug section
+@app.route("/debug/historic/check")
+def debug_check_specific():
+
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    date = request.args.get("date")
+    sd_id = request.args.get("sd_id")
+
+    if not date or not sd_id:
+        return jsonify({"error": "Provide date and sd_id"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT historic_datetime, sd_id, value
+        FROM historic_daily_data
+        WHERE sd_id = ?
+        AND substr(historic_datetime, 1, 10) = ?
+        ORDER BY historic_datetime
+    """, (sd_id, date))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([dict(row) for row in rows])
 
 # ==============================
 # RENDER PORT BIND
