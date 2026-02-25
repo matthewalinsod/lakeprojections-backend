@@ -395,29 +395,24 @@ def update_historic():
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
 
+    from zoneinfo import ZoneInfo
+    az = ZoneInfo("America/Phoenix")
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT MAX(historic_datetime) FROM historic_daily_data")
-    max_dt = cursor.fetchone()[0]
-    print("Max datetime before update:", max_dt)
+    # Arizona time (no DST issues)
+    now_az = datetime.now(az)
+    today_az = now_az.date()
+    yesterday = today_az - timedelta(days=1)
 
-    if not max_dt:
-        conn.close()
-        return jsonify({"error": "No existing historic data found"}), 400
-
-    last_date = datetime.strptime(max_dt[:10], "%Y-%m-%d")
-    start_date = last_date + timedelta(days=1)
-    yesterday = datetime.utcnow().date() - timedelta(days=1)
-
-    if start_date.date() > yesterday:
-        print("Historic daily already up to date.")
-        conn.close()
-        return jsonify({"status": "No historic update needed"})
+    # Always fetch last 7 full days
+    start_date = yesterday - timedelta(days=6)
 
     t1 = start_date.strftime("%Y-%m-%dT00:00")
     t2 = (yesterday + timedelta(days=1)).strftime("%Y-%m-%dT00:00")
 
+    print("AZ Today:", today_az)
     print("Requesting range:", t1, "to", t2)
 
     api_url = (
@@ -456,8 +451,13 @@ def update_historic():
                     VALUES (?, ?, ?)
                 """, (iso_dt, sd_id, value))
 
-                inserted += cursor.rowcount
-            except:
+                if cursor.rowcount == 1:
+                    inserted += 1
+                else:
+                    skipped += 1
+
+            except Exception as e:
+                print("Row skipped due to error:", e)
                 skipped += 1
 
     conn.commit()
@@ -478,7 +478,6 @@ def update_historic():
         "range_start": t1,
         "range_end": t2
     })
-
 
 # ==============================
 # HISTORIC HOURLY UPDATE
