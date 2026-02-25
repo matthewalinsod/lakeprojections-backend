@@ -23,6 +23,34 @@ function buildSeriesPoints(rows) {
     .map(r => [isoToMs(r.t), Number(r.v)]);
 }
 
+function roundToDecimals(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(Number(value) * factor) / factor;
+}
+
+function roundByVariable(value, variable) {
+  if (variable === "elevation") {
+    return roundToDecimals(value, 2);
+  }
+
+  // Release and energy should render as whole numbers.
+  return Math.round(Number(value));
+}
+
+function get24MSTraceStyle(traceName) {
+  const colorMap = {
+    Min: "#ff0000",
+    Most: "#008000",
+    Max: "#0000ff"
+  };
+
+  const color = colorMap[traceName] || "#5470c6";
+  return {
+    lineStyle: { width: 2, color },
+    itemStyle: { color }
+  };
+}
+
 function getActiveDam() {
   const activeTab = document.querySelector(".tab-button.active");
   return activeTab ? activeTab.dataset.dam : "hoover";
@@ -47,6 +75,9 @@ function renderElevationChart(containerId, payload) {
   const cutoverMs = isoToMs(payload.cutover);
 
   let forecast = buildSeriesPoints(payload.forecast || []);
+
+  // Forecasted elevation values should display at 2-decimal precision.
+  forecast = forecast.map(point => [point[0], roundToDecimals(point[1], 2)]);
 
   // 🔥 Remove forecast values BEFORE today
   forecast = forecast.filter(point => point[0] > cutoverMs);
@@ -261,17 +292,35 @@ async function load24MSData(month) {
     window.addEventListener("resize", () => chart24msInstance.resize());
   }
 
-  const series = payload.traces.map(trace => ({
-    name: trace.name,
-    type: "line",
-    smooth: true,
-    showSymbol: false,
-    data: trace.data
-  }));
+  const series = payload.traces.map(trace => {
+    const styledTrace = get24MSTraceStyle(trace.name);
+    const roundedData = (trace.data || []).map(point => [
+      point[0],
+      roundByVariable(point[1], variable)
+    ]);
+
+    return {
+      name: trace.name,
+      type: "line",
+      smooth: true,
+      showSymbol: false,
+      data: roundedData,
+      lineStyle: styledTrace.lineStyle,
+      itemStyle: styledTrace.itemStyle
+    };
+  });
 
   chart24msInstance.setOption({
     animation: false,
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      trigger: "axis",
+      valueFormatter: (value) => {
+        if (variable === "elevation") {
+          return Number(value).toFixed(2);
+        }
+        return `${Math.round(Number(value))}`;
+      }
+    },
     legend: { top: 10 },
     xAxis: { type: "time" },
     yAxis: { type: "value", scale: true },
