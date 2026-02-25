@@ -148,6 +148,8 @@ function renderElevationChart(containerId, payload) {
   }, true);
 
   drawTodayLine(cutoverMs);
+
+  setElevationMessage(`As of ${formatAsOfDateTime(payload.as_of)}.`);
 }
 
 function drawTodayLine(cutoverMs) {
@@ -376,6 +378,32 @@ function setReleaseMessage(message) {
   if (note) note.textContent = message || "";
 }
 
+function formatAsOfDateTime(value) {
+  if (!value) return "Unknown";
+
+  const normalized = String(value).includes("T") ? String(value) : String(value).replace(" ", "T");
+  const parsed = new Date(normalized);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+}
+
+function setElevationMessage(message) {
+  const note = document.getElementById("g1-message");
+  if (note) note.textContent = message || "";
+}
+
 function setReleaseNavButtonState(date) {
   const prevButton = document.getElementById("g3-prev-day");
   const nextButton = document.getElementById("g3-next-day");
@@ -492,7 +520,7 @@ async function loadReleaseHourlyDataForDate(dam, date) {
   setReleaseNavButtonState(payload.date);
 
   const formattedDam = dam.charAt(0).toUpperCase() + dam.slice(1);
-  setReleaseMessage(`Showing ${formattedDam} release for ${payload.date}.`);
+  setReleaseMessage(`Showing ${formattedDam} release for ${payload.date}. As of ${formatAsOfDateTime(payload.as_of)}.`);
 }
 
 async function initializeReleaseHourlyChart(dam) {

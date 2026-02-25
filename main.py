@@ -262,6 +262,7 @@ def api_elevation():
         "dam": dam,
         "range": range_key,
         "cutover": cutover,
+        "as_of": latest_accessed,
         "historic": historic,
         "forecast": forecast,
         "last_historic": {
@@ -388,6 +389,7 @@ def api_release_hourly():
     return jsonify({
         "dam": dam,
         "date": selected_date,
+        "as_of": latest_accessed,
         "historic": historic,
         "forecast": forecast
     })
