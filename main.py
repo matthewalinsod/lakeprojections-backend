@@ -39,8 +39,14 @@ LEGACY_SUBPAGES = {
 }
 
 
-def _page_context(page_kind="about", dam=None, subpage=None):
+def _page_context(page_kind="home", dam=None, subpage=None):
     active_lake = DAM_TO_LAKE_SLUG.get(dam) if dam else None
+    weather_city = "Las Vegas"
+    if active_lake == "lake-mohave":
+        weather_city = "Bullhead City"
+    elif active_lake == "lake-havasu":
+        weather_city = "Havasu City"
+
     return {
         "lakes": LAKES,
         "dams": DAMS,
@@ -49,6 +55,7 @@ def _page_context(page_kind="about", dam=None, subpage=None):
         "active_dam": dam,
         "active_lake": active_lake,
         "active_subpage": subpage,
+        "weather_city": weather_city,
     }
 
 
@@ -178,12 +185,7 @@ def authorize(req):
 
 @app.route("/")
 def home():
-    return redirect(url_for("about"))
-
-
-@app.route("/about")
-def about():
-    return render_template("about.html", **_page_context("about"))
+    return render_template("home.html", **_page_context("home"))
 
 
 @app.route("/<lake_slug>")

@@ -9,12 +9,38 @@ body {
     background-color: #1b2734;
     color: #ffffff;
     padding: 18px 24px;
-    text-align: center;
+    text-align: left;
 }
 
 .site-title-band h1 {
     margin: 0;
     font-size: 2rem;
+}
+
+.site-title-band {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.weather-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid #49617a;
+    border-radius: 4px;
+    background: #243243;
+    font-size: 13px;
+}
+
+.weather-city {
+    font-weight: 700;
+}
+
+.weather-status {
+    color: #d5e1ef;
 }
 
 .site-nav {
@@ -42,7 +68,7 @@ body {
     gap: 8px;
     flex-wrap: wrap;
     align-items: stretch;
-    justify-content: center;
+    justify-content: flex-start;
 }
 
 .nav-item {
@@ -70,16 +96,20 @@ body {
 
 .nav-lake-row {
     display: flex;
-    gap: 2px;
+    gap: 0;
 }
 
 .nav-dropdown-toggle {
     border: 0;
-    border-radius: 4px;
+    border-radius: 0 4px 4px 0;
     background: #33475d;
     color: #e4edf7;
     padding: 0 10px;
     cursor: pointer;
+}
+
+.nav-lake-row .nav-link {
+    border-radius: 4px 0 0 4px;
 }
 
 .nav-item.active-top .nav-dropdown-toggle,
@@ -92,7 +122,7 @@ body {
     display: none;
     position: absolute;
     left: 0;
-    top: calc(100% + 4px);
+    top: 100%;
     min-width: 220px;
     list-style: none;
     margin: 0;
@@ -154,7 +184,7 @@ body {
 
 .main-content-shell {
     max-width: 1840px;
-    margin: 0 auto;
+    margin: 0;
     display: grid;
     grid-template-columns: 220px minmax(0, 1fr) 220px;
     gap: 24px;
@@ -165,7 +195,7 @@ body {
 .main-content-container {
     max-width: 1320px;
     width: 100%;
-    margin: 0 auto;
+    margin: 0;
 }
 
 .main-content {
@@ -318,19 +348,19 @@ body {
         text-align: left;
     }
 
-    .nav-toggle {
-        display: inline-block;
-        margin-bottom: 8px;
+    .site-title-band {
+        flex-wrap: wrap;
+    }
+
+    .weather-widget {
+        width: 100%;
+        box-sizing: border-box;
+        justify-content: flex-start;
     }
 
     .site-nav-list {
-        display: none;
-        flex-direction: column;
+        flex-direction: row;
         align-items: stretch;
-    }
-
-    .site-nav-list.open {
-        display: flex;
     }
 
     .nav-lake-row {
