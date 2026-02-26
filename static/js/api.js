@@ -8,6 +8,26 @@ async function fetchElevationSeries(dam, range) {
   return await res.json();
 }
 
+async function fetchLakeMeadReleaseSeries(range) {
+  const url = `/api/lake-mead/releases?range=${encodeURIComponent(range)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return await res.json();
+}
+
+async function fetchLakeMeadEnergySeries(range) {
+  const url = `/api/lake-mead/energy?range=${encodeURIComponent(range)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return await res.json();
+}
+
 
 async function fetchReleaseHourlyDates(dam) {
   const url = `/api/release/hourly/dates?dam=${encodeURIComponent(dam)}`;
