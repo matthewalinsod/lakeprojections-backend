@@ -402,12 +402,31 @@ def _find_existing_column(columns, candidates):
     return None
 
 
+CHART4_UNIT_CONFIG = {
+    "davis": [
+        {"sd_id": 14163, "unit": "D1", "unit_number": 1},
+        {"sd_id": 14164, "unit": "D2", "unit_number": 2},
+        {"sd_id": 14165, "unit": "D3", "unit_number": 3},
+        {"sd_id": 14166, "unit": "D4", "unit_number": 4},
+        {"sd_id": 14167, "unit": "D5", "unit_number": 5},
+    ],
+    "parker": [
+        {"sd_id": 14168, "unit": "P1", "unit_number": 1},
+        {"sd_id": 14169, "unit": "P2", "unit_number": 2},
+        {"sd_id": 14170, "unit": "P3", "unit_number": 3},
+        {"sd_id": 14171, "unit": "P4", "unit_number": 4},
+    ],
+}
+
+
 def _get_energy_unit_rows(cursor, dam):
+    fallback_units = [dict(unit) for unit in CHART4_UNIT_CONFIG.get(dam, [])]
+
     cursor.execute("PRAGMA table_info(sdid_mapping)")
     mapping_columns = [row[1] for row in cursor.fetchall()]
 
     if not mapping_columns:
-        return []
+        return fallback_units
 
     id_col = _find_existing_column(mapping_columns, ["sd_id", "sdi", "sdid", "id"])
     label_col = _find_existing_column(mapping_columns, [
@@ -416,13 +435,23 @@ def _get_energy_unit_rows(cursor, dam):
     dam_col = _find_existing_column(mapping_columns, ["dam", "dam_name", "reservoir", "location", "site"])
 
     if not id_col or not label_col:
-        return []
+        return fallback_units
 
     dam_prefix = "P" if dam == "parker" else "D"
     dam_name_like = "Parker" if dam == "parker" else "Davis"
 
-    where_clauses = [f"UPPER({label_col}) GLOB ?"]
-    params = [f"{dam_prefix}[0-9]*"]
+    where_clauses = [
+        "(" + " OR ".join([
+            f"UPPER({label_col}) GLOB ?",
+            f"UPPER({label_col}) LIKE ?",
+            f"UPPER({label_col}) LIKE ?"
+        ]) + ")"
+    ]
+    params = [
+        f"{dam_prefix}[0-9]*",
+        f"%{dam_name_like.upper()}%UNIT%",
+        f"%{dam_prefix}%UNIT%"
+    ]
 
     if dam_col:
         where_clauses.append(f"UPPER({dam_col}) LIKE ?")
@@ -440,14 +469,19 @@ def _get_energy_unit_rows(cursor, dam):
     units = []
     for row in rows:
         label = str(row["unit_label"] or "").strip().upper()
-        match = re.match(rf"^{dam_prefix}(\d+)$", label)
+        match = re.search(rf"\b{dam_prefix}\s*-?\s*(\d+)\b", label)
+        if not match:
+            match = re.search(rf"\b{dam_name_like.upper()}\s+UNIT\s*-?\s*(\d+)\b", label)
         if not match:
             continue
         units.append({
             "sd_id": int(row["sd_id"]),
-            "unit": label,
+            "unit": f"{dam_prefix}{int(match.group(1))}",
             "unit_number": int(match.group(1))
         })
+
+    if not units:
+        return fallback_units
 
     units.sort(key=lambda u: u["unit_number"])
     return units
