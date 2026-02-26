@@ -121,7 +121,8 @@ body {
   border-color: #d8dee7;
 }
 
-#g3-date {
+#g3-date,
+#g4-date {
   padding: 6px 8px;
   border: 1px solid #c8d0dc;
   border-radius: 4px;
@@ -129,7 +130,8 @@ body {
   background-color: #fff;
 }
 
-#g3-date:disabled {
+#g3-date:disabled,
+#g4-date:disabled {
   background-color: #e9edf2;
   color: #808080;
 }

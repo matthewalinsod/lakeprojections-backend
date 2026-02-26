@@ -3,6 +3,9 @@ let chart24msInstance = null;
 let chartReleaseHourlyInstance = null;
 let releaseAvailableDates = [];
 let releaseDateSet = new Set();
+let energyUnitAvailableDates = [];
+let energyUnitDateSet = new Set();
+let chartEnergyUnitHourlyInstance = null;
 
 const HISTORIC_SERIES_COLOR = "#1f78ff";
 const FORECAST_SERIES_COLOR = "#2e8b57";
@@ -356,6 +359,10 @@ document.querySelectorAll(".tab-button").forEach(btn => {
     initializeReleaseHourlyChart(this.dataset.dam).catch(err =>
       console.error("Hourly release chart initialization failed:", err)
     );
+
+    initializeEnergyUnitHourlyChart(this.dataset.dam).catch(err =>
+      console.error("Hourly unit energy chart initialization failed:", err)
+    );
   });
 });
 
@@ -641,4 +648,306 @@ async function initializeReleaseHourlyChart(dam) {
   }
 
   await loadReleaseHourlyDataForDate(dam, selectedDate);
+}
+
+// ==============================
+// GRAPH 4 — Hourly Energy by Unit (Davis/Parker)
+// ==============================
+
+function setEnergyUnitMessage(message) {
+  const note = document.getElementById("g4-message");
+  if (note) note.textContent = message || "";
+}
+
+function setEnergyUnitNavButtonState(date) {
+  const prevButton = document.getElementById("g4-prev-day");
+  const nextButton = document.getElementById("g4-next-day");
+
+  if (!prevButton || !nextButton) return;
+
+  if (!energyUnitAvailableDates.length) {
+    prevButton.disabled = true;
+    nextButton.disabled = true;
+    return;
+  }
+
+  const currentIndex = energyUnitAvailableDates.indexOf(date);
+
+  if (currentIndex === -1) {
+    prevButton.disabled = true;
+    nextButton.disabled = true;
+    return;
+  }
+
+  prevButton.disabled = currentIndex <= 0;
+  nextButton.disabled = currentIndex >= energyUnitAvailableDates.length - 1;
+}
+
+function updateEnergyUnitDateInputState(dateInput, enabled) {
+  if (!dateInput) return;
+  dateInput.disabled = !enabled;
+
+  if (!enabled) {
+    dateInput.removeAttribute("min");
+    dateInput.removeAttribute("max");
+    setEnergyUnitNavButtonState("");
+    return;
+  }
+
+  if (energyUnitAvailableDates.length) {
+    dateInput.min = energyUnitAvailableDates[0];
+    dateInput.max = energyUnitAvailableDates[energyUnitAvailableDates.length - 1];
+  }
+
+  setEnergyUnitNavButtonState(normalizeDateInput(dateInput.value));
+}
+
+function renderEnergyUnitHourlyChart(payload) {
+  const container = document.getElementById("chartEnergyUnitHourly");
+  if (!container || !payload) return;
+
+  if (!chartEnergyUnitHourlyInstance) {
+    chartEnergyUnitHourlyInstance = echarts.init(container);
+    window.addEventListener("resize", () => chartEnergyUnitHourlyInstance.resize());
+  }
+
+  const hours = Array.from({ length: 24 }, (_, idx) => idx);
+  const hourLabels = hours.map(formatHourLabel);
+  const units = (payload.units || []).map(row => row.unit);
+
+  const unitIndexBySdId = new Map((payload.units || []).map((row, idx) => [Number(row.sd_id), idx]));
+  const cellByUnitAndHour = new Map();
+
+  (payload.historic || []).forEach(row => {
+    const unitIndex = unitIndexBySdId.get(Number(row.sd_id));
+    if (unitIndex === undefined) return;
+
+    const hour = Number(row.hour);
+    const key = `${unitIndex}-${hour}`;
+    cellByUnitAndHour.set(key, {
+      x: hour,
+      y: unitIndex,
+      value: Math.round(Number(row.v)),
+      source: "Historic"
+    });
+  });
+
+  (payload.forecast || []).forEach(row => {
+    const unitIndex = unitIndexBySdId.get(Number(row.sd_id));
+    if (unitIndex === undefined) return;
+
+    const hour = Number(row.hour);
+    const key = `${unitIndex}-${hour}`;
+    cellByUnitAndHour.set(key, {
+      x: hour,
+      y: unitIndex,
+      value: Math.round(Number(row.v)),
+      source: "Forecast"
+    });
+  });
+
+  const values = Array.from(cellByUnitAndHour.values()).map(cell => cell.value);
+  const hasValues = values.length > 0;
+  const minValue = hasValues ? Math.min(...values) : 0;
+  const maxValue = hasValues ? Math.max(...values) : 1;
+
+  const heatmapData = [];
+  cellByUnitAndHour.forEach(cell => {
+    heatmapData.push([cell.x, cell.y, cell.value, cell.source]);
+  });
+
+  chartEnergyUnitHourlyInstance.setOption({
+    animation: false,
+    tooltip: {
+      position: "top",
+      formatter: (params) => {
+        if (!params || !params.data) return "No data";
+        const hour = hourLabels[params.data[0]];
+        const unit = units[params.data[1]];
+        const value = params.data[2];
+        const source = params.data[3];
+        return `${unit}, hour ${hour}: ${value} MWh (${source})`;
+      }
+    },
+    grid: { left: 70, right: 20, top: 40, bottom: 55 },
+    xAxis: {
+      type: "category",
+      data: hourLabels,
+      name: "Hour Start",
+      nameLocation: "middle",
+      nameGap: 30,
+      splitArea: { show: true }
+    },
+    yAxis: {
+      type: "category",
+      data: units,
+      inverse: false,
+      splitArea: { show: true }
+    },
+    visualMap: {
+      min: minValue,
+      max: maxValue,
+      calculable: true,
+      orient: "horizontal",
+      left: "center",
+      bottom: 5,
+      inRange: {
+        color: ["#edf4ff", "#9ec5ff", "#2f6fcc"]
+      }
+    },
+    series: [
+      {
+        name: "Energy",
+        type: "heatmap",
+        data: heatmapData,
+        label: {
+          show: true,
+          formatter: (params) => params.data[2],
+          color: "#0e2239",
+          fontSize: 11
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: "rgba(0, 0, 0, 0.5)"
+          }
+        }
+      }
+    ]
+  }, true);
+}
+
+async function loadEnergyUnitHourlyDataForDate(dam, date) {
+  const payload = await fetchEnergyUnitHourlySeries(dam, date);
+  renderEnergyUnitHourlyChart(payload);
+
+  const dateInput = document.getElementById("g4-date");
+  if (dateInput) {
+    dateInput.value = payload.date;
+  }
+
+  setEnergyUnitNavButtonState(payload.date);
+
+  const formattedDam = dam.charAt(0).toUpperCase() + dam.slice(1);
+  setEnergyUnitMessage(`Showing ${formattedDam} unit energy for ${payload.date}. As of ${formatAsOfDateTime(payload.as_of)}.`);
+}
+
+async function initializeEnergyUnitHourlyChart(dam) {
+  const dateInput = document.getElementById("g4-date");
+  const prevButton = document.getElementById("g4-prev-day");
+  const nextButton = document.getElementById("g4-next-day");
+  const container = document.getElementById("chartEnergyUnitHourly");
+  if (!dateInput || !container || !prevButton || !nextButton) return;
+
+  if (!["davis", "parker"].includes(dam)) {
+    updateEnergyUnitDateInputState(dateInput, false);
+    dateInput.value = "";
+    energyUnitAvailableDates = [];
+    energyUnitDateSet = new Set();
+    setEnergyUnitNavButtonState("");
+
+    if (chartEnergyUnitHourlyInstance) {
+      chartEnergyUnitHourlyInstance.clear();
+      chartEnergyUnitHourlyInstance.setOption({
+        xAxis: { show: false },
+        yAxis: { show: false },
+        series: []
+      });
+    }
+
+    setEnergyUnitMessage("Chart 4 is available only for Davis and Parker.");
+    return;
+  }
+
+  const datesPayload = await fetchEnergyUnitHourlyDates(dam);
+  energyUnitAvailableDates = (datesPayload.dates || []).slice().sort();
+  energyUnitDateSet = new Set(energyUnitAvailableDates);
+
+  if (!energyUnitAvailableDates.length) {
+    updateEnergyUnitDateInputState(dateInput, false);
+    dateInput.value = "";
+
+    if (chartEnergyUnitHourlyInstance) {
+      chartEnergyUnitHourlyInstance.clear();
+    }
+
+    setEnergyUnitNavButtonState("");
+    setEnergyUnitMessage("No hourly unit energy data is available for this dam yet.");
+    return;
+  }
+
+  updateEnergyUnitDateInputState(dateInput, true);
+
+  const currentInput = normalizeDateInput(dateInput.value);
+  const selectedDate = energyUnitDateSet.has(currentInput)
+    ? currentInput
+    : energyUnitAvailableDates[energyUnitAvailableDates.length - 1];
+
+  dateInput.value = selectedDate;
+
+  if (!dateInput.dataset.boundEnergyUnitListener) {
+    dateInput.addEventListener("change", async (event) => {
+      const picked = normalizeDateInput(event.target.value);
+
+      if (!energyUnitDateSet.has(picked)) {
+        event.target.value = energyUnitAvailableDates[energyUnitAvailableDates.length - 1] || "";
+        setEnergyUnitMessage("Selected date has no data and cannot be used.");
+        setEnergyUnitNavButtonState(normalizeDateInput(event.target.value));
+        return;
+      }
+
+      const activeDam = getActiveDam();
+      if (!["davis", "parker"].includes(activeDam)) return;
+
+      try {
+        await loadEnergyUnitHourlyDataForDate(activeDam, picked);
+      } catch (error) {
+        console.error("Failed to load hourly unit energy:", error);
+        setEnergyUnitMessage("Unable to load hourly unit energy data.");
+      }
+    });
+    dateInput.dataset.boundEnergyUnitListener = "true";
+  }
+
+  if (!prevButton.dataset.boundEnergyUnitListener) {
+    prevButton.addEventListener("click", async () => {
+      const activeDam = getActiveDam();
+      if (!["davis", "parker"].includes(activeDam)) return;
+
+      const current = normalizeDateInput(dateInput.value);
+      const currentIndex = energyUnitAvailableDates.indexOf(current);
+      if (currentIndex <= 0) return;
+
+      const previousDate = energyUnitAvailableDates[currentIndex - 1];
+      try {
+        await loadEnergyUnitHourlyDataForDate(activeDam, previousDate);
+      } catch (error) {
+        console.error("Failed to load previous hourly unit energy:", error);
+        setEnergyUnitMessage("Unable to load hourly unit energy data.");
+      }
+    });
+    prevButton.dataset.boundEnergyUnitListener = "true";
+  }
+
+  if (!nextButton.dataset.boundEnergyUnitListener) {
+    nextButton.addEventListener("click", async () => {
+      const activeDam = getActiveDam();
+      if (!["davis", "parker"].includes(activeDam)) return;
+
+      const current = normalizeDateInput(dateInput.value);
+      const currentIndex = energyUnitAvailableDates.indexOf(current);
+      if (currentIndex === -1 || currentIndex >= energyUnitAvailableDates.length - 1) return;
+
+      const nextDate = energyUnitAvailableDates[currentIndex + 1];
+      try {
+        await loadEnergyUnitHourlyDataForDate(activeDam, nextDate);
+      } catch (error) {
+        console.error("Failed to load next hourly unit energy:", error);
+        setEnergyUnitMessage("Unable to load hourly unit energy data.");
+      }
+    });
+    nextButton.dataset.boundEnergyUnitListener = "true";
+  }
+
+  await loadEnergyUnitHourlyDataForDate(dam, selectedDate);
 }

@@ -28,3 +28,23 @@ async function fetchReleaseHourlySeries(dam, date) {
   }
   return await res.json();
 }
+
+async function fetchEnergyUnitHourlyDates(dam) {
+  const url = `/api/energy/hourly/units/dates?dam=${encodeURIComponent(dam)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return await res.json();
+}
+
+async function fetchEnergyUnitHourlySeries(dam, date) {
+  const url = `/api/energy/hourly/units?dam=${encodeURIComponent(dam)}&date=${encodeURIComponent(date)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return await res.json();
+}

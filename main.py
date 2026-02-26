@@ -394,6 +394,197 @@ def api_release_hourly():
         "forecast": forecast
     })
 
+
+def _find_existing_column(columns, candidates):
+    for candidate in candidates:
+        if candidate in columns:
+            return candidate
+    return None
+
+
+def _get_energy_unit_rows(cursor, dam):
+    cursor.execute("PRAGMA table_info(sdid_mapping)")
+    mapping_columns = [row[1] for row in cursor.fetchall()]
+
+    if not mapping_columns:
+        return []
+
+    id_col = _find_existing_column(mapping_columns, ["sd_id", "sdi", "sdid", "id"])
+    label_col = _find_existing_column(mapping_columns, [
+        "unit", "unit_name", "label", "name", "series_name", "sdi_name", "description"
+    ])
+    dam_col = _find_existing_column(mapping_columns, ["dam", "dam_name", "reservoir", "location", "site"])
+
+    if not id_col or not label_col:
+        return []
+
+    dam_prefix = "P" if dam == "parker" else "D"
+    dam_name_like = "Parker" if dam == "parker" else "Davis"
+
+    where_clauses = [f"UPPER({label_col}) GLOB ?"]
+    params = [f"{dam_prefix}[0-9]*"]
+
+    if dam_col:
+        where_clauses.append(f"UPPER({dam_col}) LIKE ?")
+        params.append(f"%{dam_name_like.upper()}%")
+
+    query = f"""
+        SELECT {id_col} AS sd_id, {label_col} AS unit_label
+        FROM sdid_mapping
+        WHERE {' AND '.join(where_clauses)}
+    """
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    units = []
+    for row in rows:
+        label = str(row["unit_label"] or "").strip().upper()
+        match = re.match(rf"^{dam_prefix}(\d+)$", label)
+        if not match:
+            continue
+        units.append({
+            "sd_id": int(row["sd_id"]),
+            "unit": label,
+            "unit_number": int(match.group(1))
+        })
+
+    units.sort(key=lambda u: u["unit_number"])
+    return units
+
+
+@app.route("/api/energy/hourly/units/dates", methods=["GET"])
+def api_energy_hourly_unit_dates():
+    dam = (request.args.get("dam") or "").lower().strip()
+
+    if dam not in ["davis", "parker"]:
+        return jsonify({"error": "Chart 4 is only available for Davis and Parker"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    unit_rows = _get_energy_unit_rows(cursor, dam)
+    if not unit_rows:
+        conn.close()
+        return jsonify({"dam": dam, "dates": []})
+
+    sd_ids = [row["sd_id"] for row in unit_rows]
+    placeholders = ",".join(["?"] * len(sd_ids))
+
+    cursor.execute(f"""
+        SELECT DISTINCT substr(historic_datetime, 1, 10) AS dt
+        FROM historic_hourly_data
+        WHERE sd_id IN ({placeholders})
+        UNION
+        SELECT DISTINCT substr(forecasted_datetime, 1, 10) AS dt
+        FROM forecasted_hourly_data
+        WHERE sd_id IN ({placeholders})
+        ORDER BY dt ASC
+    """, sd_ids + sd_ids)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    dates = [row["dt"] for row in rows if row["dt"]]
+
+    return jsonify({
+        "dam": dam,
+        "dates": dates
+    })
+
+
+@app.route("/api/energy/hourly/units", methods=["GET"])
+def api_energy_hourly_units():
+    dam = (request.args.get("dam") or "").lower().strip()
+    selected_date = (request.args.get("date") or "").strip()
+
+    if dam not in ["davis", "parker"]:
+        return jsonify({"error": "Chart 4 is only available for Davis and Parker"}), 400
+
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", selected_date):
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    unit_rows = _get_energy_unit_rows(cursor, dam)
+    if not unit_rows:
+        conn.close()
+        return jsonify({
+            "dam": dam,
+            "date": selected_date,
+            "as_of": None,
+            "units": [],
+            "historic": [],
+            "forecast": []
+        })
+
+    sd_ids = [row["sd_id"] for row in unit_rows]
+    placeholders = ",".join(["?"] * len(sd_ids))
+    day_start = f"{selected_date}T00:00:00"
+    day_end = f"{selected_date}T23:59:59"
+
+    cursor.execute(f"""
+        SELECT MAX(datetime_accessed)
+        FROM forecasted_hourly_data
+        WHERE sd_id IN ({placeholders})
+    """, sd_ids)
+    latest_accessed = cursor.fetchone()[0]
+
+    cursor.execute(f"""
+        SELECT sd_id, historic_datetime, value
+        FROM historic_hourly_data
+        WHERE sd_id IN ({placeholders})
+          AND historic_datetime >= ?
+          AND historic_datetime <= ?
+        ORDER BY sd_id ASC, historic_datetime ASC
+    """, sd_ids + [day_start, day_end])
+    historic_rows = cursor.fetchall()
+
+    forecast_rows = []
+    if latest_accessed:
+        cursor.execute(f"""
+            SELECT sd_id, forecasted_datetime, value
+            FROM forecasted_hourly_data
+            WHERE sd_id IN ({placeholders})
+              AND datetime_accessed = ?
+              AND forecasted_datetime >= ?
+              AND forecasted_datetime <= ?
+            ORDER BY sd_id ASC, forecasted_datetime ASC
+        """, sd_ids + [latest_accessed, day_start, day_end])
+        forecast_rows = cursor.fetchall()
+
+    conn.close()
+
+    historic = [
+        {
+            "sd_id": int(row["sd_id"]),
+            "t": row["historic_datetime"],
+            "hour": int(row["historic_datetime"][11:13]),
+            "v": row["value"]
+        }
+        for row in historic_rows
+    ]
+
+    forecast = [
+        {
+            "sd_id": int(row["sd_id"]),
+            "t": row["forecasted_datetime"],
+            "hour": int(row["forecasted_datetime"][11:13]),
+            "v": row["value"]
+        }
+        for row in forecast_rows
+    ]
+
+    return jsonify({
+        "dam": dam,
+        "date": selected_date,
+        "as_of": latest_accessed,
+        "units": unit_rows,
+        "historic": historic,
+        "forecast": forecast
+    })
+
 # ==============================
 # 24 MONTH STUDY (24MS) API
 # ==============================

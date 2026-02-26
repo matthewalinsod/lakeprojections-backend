@@ -20,6 +20,11 @@ document.addEventListener("DOMContentLoaded", () => {
     await initializeReleaseHourlyChart(activeDam);
   }
 
+  async function loadEnergyByUnitHourly() {
+    if (typeof initializeEnergyUnitHourlyChart !== "function") return;
+    await initializeEnergyUnitHourlyChart(activeDam);
+  }
+
   // Tabs
   tabButtons.forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -31,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await loadElevation();
       await loadReleaseHourly();
+      await loadEnergyByUnitHourly();
     });
   });
 
@@ -48,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial load
   Promise.all([
     loadElevation(),
-    loadReleaseHourly()
+    loadReleaseHourly(),
+    loadEnergyByUnitHourly()
   ]).catch(err => console.error(err));
 });
