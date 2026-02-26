@@ -2,19 +2,17 @@
 
 {% block content %}
 
-<div class="tabs">
-    <button class="tab-button active" data-dam="hoover">Hoover</button>
-    <button class="tab-button" data-dam="davis">Davis</button>
-    <button class="tab-button" data-dam="parker">Parker</button>
-</div>
-
 <div class="current-dam">
-    Currently Viewing: <span id="activeDam">Hoover</span>
+    {{ dam_label }} — {{ subpage_label }}
 </div>
 
-<div class="dashboard-grid">
-
-    <!-- GRAPH 1 -->
+{% if subpage == 'overview' %}
+<div class="card">
+    <h3>{{ dam_label }}</h3>
+    <p>Use the subpage navigation to view Elevation, Releases, Energy, and 24-Month Study data for this dam.</p>
+</div>
+{% elif subpage == 'elevation' %}
+<div class="dashboard-grid single-column">
     <div class="card">
         <div class="card-header">
             <h3>Elevation (Historic + Forecast)</h3>
@@ -30,28 +28,32 @@
         <div id="chartElevation" class="chart"></div>
         <div id="g1-message" class="chart-note"></div>
     </div>
-
-    <!-- GRAPH 2 -->
-    <div class="card">
-    <div class="card-header">
-        <h3>24 Month Study</h3>
-
-        <div class="graph-controls">
-            <select id="g2-variable">
-                <option value="elevation">Elevation</option>
-                <option value="release">Release</option>
-                <option value="energy">Energy</option>
-            </select>
-
-            <select id="g2-month">
-                <option>Loading...</option>
-            </select>
-        </div>
-    </div>
-
-    <div id="chart24ms" class="chart"></div>
 </div>
+{% elif subpage == 'study' %}
+<div class="dashboard-grid single-column">
+    <div class="card">
+        <div class="card-header">
+            <h3>24 Month Study</h3>
 
+            <div class="graph-controls">
+                <select id="g2-variable">
+                    <option value="elevation">Elevation</option>
+                    <option value="release">Release</option>
+                    <option value="energy">Energy</option>
+                </select>
+
+                <select id="g2-month">
+                    <option>Loading...</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="chart24ms" class="chart"></div>
+    </div>
+</div>
+{% elif subpage == 'releases' %}
+<div class="dashboard-grid single-column">
+    {% if dam in ['davis', 'parker'] %}
     <div class="card">
         <div class="card-header">
             <h3>Release by Hour (CFS)</h3>
@@ -66,7 +68,16 @@
         <div id="chartReleaseHourly" class="chart"></div>
         <div id="g3-message" class="chart-note"></div>
     </div>
-
+    {% else %}
+    <div class="card">
+        <h3>Releases</h3>
+        <p>Release-by-hour chart is currently available for Lake Mohave (Davis Dam) and Lake Havasu (Parker Dam).</p>
+    </div>
+    {% endif %}
+</div>
+{% elif subpage == 'energy' %}
+<div class="dashboard-grid single-column">
+    {% if dam in ['davis', 'parker'] %}
     <div class="card">
         <div class="card-header">
             <h3>Hourly Energy by Unit (MWh)</h3>
@@ -81,12 +92,13 @@
         <div id="chartEnergyUnitHourly" class="chart"></div>
         <div id="g4-message" class="chart-note"></div>
     </div>
-
+    {% else %}
     <div class="card">
-        <h3>Additional Metric</h3>
-        <div class="chart-placeholder">Chart 5</div>
+        <h3>Energy</h3>
+        <p>Hourly energy-by-unit chart is currently available for Lake Mohave (Davis Dam) and Lake Havasu (Parker Dam).</p>
     </div>
-
+    {% endif %}
 </div>
+{% endif %}
 
 {% endblock %}

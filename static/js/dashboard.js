@@ -1,60 +1,45 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const tabButtons = document.querySelectorAll(".tab-button");
-  const activeDamLabel = document.getElementById("activeDam");
+  const page = document.body.dataset.page;
+  const dam = document.body.dataset.dam;
+  const subpage = document.body.dataset.subpage;
 
-  const rangeButtons = document.querySelectorAll(".range-btn");
-  let activeDam = "hoover";
-  let activeRange = "30d"; // MTD default
-
-  function titleCase(s) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
+  if (page !== "dam" || !dam || !subpage) return;
 
   async function loadElevation() {
-    const payload = await fetchElevationSeries(activeDam, activeRange);
+    const activeButton = document.querySelector(".range-btn.active");
+    const activeRange = activeButton ? activeButton.dataset.range : "30d";
+    const payload = await fetchElevationSeries(dam, activeRange);
     renderElevationChart("chartElevation", payload);
   }
 
-  async function loadReleaseHourly() {
+  async function loadReleases() {
     if (typeof initializeReleaseHourlyChart !== "function") return;
-    await initializeReleaseHourlyChart(activeDam);
+    await initializeReleaseHourlyChart(dam);
   }
 
-  async function loadEnergyByUnitHourly() {
+  async function loadEnergy() {
     if (typeof initializeEnergyUnitHourlyChart !== "function") return;
-    await initializeEnergyUnitHourlyChart(activeDam);
+    await initializeEnergyUnitHourlyChart(dam);
   }
 
-  // Tabs
-  tabButtons.forEach(btn => {
-    btn.addEventListener("click", async () => {
-      tabButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-
-      activeDam = btn.dataset.dam;
-      activeDamLabel.textContent = titleCase(activeDam);
-
-      await loadElevation();
-      await loadReleaseHourly();
-      await loadEnergyByUnitHourly();
+  if (subpage === "elevation") {
+    const rangeButtons = document.querySelectorAll(".range-btn");
+    rangeButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        rangeButtons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        await loadElevation();
+      });
     });
-  });
 
-  // Range filters
-  rangeButtons.forEach(btn => {
-    btn.addEventListener("click", async () => {
-      rangeButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
+    loadElevation().catch((err) => console.error(err));
+  }
 
-      activeRange = btn.dataset.range;
-      await loadElevation();
-    });
-  });
+  if (subpage === "releases") {
+    loadReleases().catch((err) => console.error(err));
+  }
 
-  // Initial load
-  Promise.all([
-    loadElevation(),
-    loadReleaseHourly(),
-    loadEnergyByUnitHourly()
-  ]).catch(err => console.error(err));
+  if (subpage === "energy") {
+    loadEnergy().catch((err) => console.error(err));
+  }
 });

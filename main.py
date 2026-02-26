@@ -5,13 +5,37 @@ import requests
 import time
 import re
 from datetime import datetime, timedelta
-from flask import render_template
+from flask import render_template, abort, redirect, url_for
 
 app = Flask(__name__)
 print("MAIN.PY LOADED")
 DB_PATH = "/data/lakeprojections.db"
 print("DB PATH EXISTS:", os.path.exists(DB_PATH))
 UPDATE_TOKEN = os.environ.get("UPDATE_TOKEN")
+
+DAMS = {
+    "hoover": "Lake Mead (Hoover Dam)",
+    "davis": "Lake Mohave (Davis Dam)",
+    "parker": "Lake Havasu (Parker Dam)",
+}
+
+SUBPAGES = {
+    "overview": "Overview",
+    "elevation": "Elevation",
+    "releases": "Releases",
+    "energy": "Energy",
+    "study": "24-Month Study",
+}
+
+
+def _page_context(page_kind="about", dam=None, subpage=None):
+    return {
+        "dams": DAMS,
+        "subpages": SUBPAGES,
+        "active_page": page_kind,
+        "active_dam": dam,
+        "active_subpage": subpage,
+    }
 
 
 def _parse_24ms_month_label(month_label):
@@ -139,8 +163,31 @@ def authorize(req):
 # ==============================
 
 @app.route("/")
-def dashboard():
-    return render_template("dashboard.html")
+def home():
+    return redirect(url_for("about"))
+
+
+@app.route("/about")
+def about():
+    return render_template("about.html", **_page_context("about"))
+
+
+@app.route("/<dam>/<subpage>")
+def dam_subpage(dam, subpage):
+    dam = (dam or "").lower().strip()
+    subpage = (subpage or "").lower().strip()
+
+    if dam not in DAMS or subpage not in SUBPAGES:
+        abort(404)
+
+    return render_template(
+        "dashboard.html",
+        dam=dam,
+        subpage=subpage,
+        dam_label=DAMS[dam],
+        subpage_label=SUBPAGES[subpage],
+        **_page_context("dam", dam=dam, subpage=subpage),
+    )
 
 
 @app.route("/health")
@@ -270,7 +317,6 @@ def api_elevation():
             "v": last_hist_value
         }
     })
-
 
 
 # API release hourly for Chart 3 (Davis/Parker)

@@ -63,8 +63,7 @@ function get24MSTraceStyle(traceName) {
 }
 
 function getActiveDam() {
-  const activeTab = document.querySelector(".tab-button.active");
-  return activeTab ? activeTab.dataset.dam : "hoover";
+  return document.body?.dataset?.dam || "hoover";
 }
 
 // ==============================
@@ -340,34 +339,6 @@ async function load24MSData(month) {
     series: series
   }, true);
 }
-
-// Reload when dam tab changes
-document.querySelectorAll(".tab-button").forEach(btn => {
-  btn.addEventListener("click", function () {
-    document.querySelectorAll(".tab-button")
-      .forEach(b => b.classList.remove("active"));
-
-    this.classList.add("active");
-    document.getElementById("activeDam").textContent =
-      this.textContent;
-
-    const selectedMonth =
-      document.getElementById("g2-month")?.value;
-
-    if (selectedMonth) {
-      load24MSData(selectedMonth);
-    }
-
-    initializeReleaseHourlyChart(this.dataset.dam).catch(err =>
-      console.error("Hourly release chart initialization failed:", err)
-    );
-
-    initializeEnergyUnitHourlyChart(this.dataset.dam).catch(err =>
-      console.error("Hourly unit energy chart initialization failed:", err)
-    );
-  });
-});
-
 
 // ==============================
 // GRAPH 3 — Hourly Release (Davis/Parker)
