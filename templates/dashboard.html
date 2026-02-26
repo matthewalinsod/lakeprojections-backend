@@ -68,8 +68,18 @@
     </div>
 
     <div class="card">
-        <h3>24 Month Study Energy</h3>
-        <div class="chart-placeholder">Chart 4</div>
+        <div class="card-header">
+            <h3>Hourly Energy by Unit (MWh)</h3>
+
+            <div class="graph-controls">
+                <button type="button" id="g4-prev-day" class="g3-day-nav" aria-label="Previous day">&lt;</button>
+                <input type="date" id="g4-date" aria-label="Select unit energy date">
+                <button type="button" id="g4-next-day" class="g3-day-nav" aria-label="Next day">&gt;</button>
+            </div>
+        </div>
+
+        <div id="chartEnergyUnitHourly" class="chart"></div>
+        <div id="g4-message" class="chart-note"></div>
     </div>
 
     <div class="card">
