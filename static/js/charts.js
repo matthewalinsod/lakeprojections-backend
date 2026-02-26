@@ -200,7 +200,7 @@ function renderElevationSummary(payload) {
   const summaryEl = document.getElementById("elevationSummary");
   if (!summaryEl || !payload) return;
 
-  const lakeName = document.querySelector(".current-dam h2")?.textContent?.trim() || "the lake";
+  const lakeName = summaryEl.dataset.lakeName?.trim() || document.querySelector(".current-dam h2")?.textContent?.trim() || "the lake";
   const historic = buildSeriesPoints(payload.historic || []);
   const forecast = buildSeriesPoints(payload.forecast || []);
 
@@ -228,7 +228,7 @@ function renderElevationSummary(payload) {
   const nextWeekDelta = nextWeekPoint[1] - currentValue;
   const nextMonthDelta = nextMonthPoint[1] - currentValue;
 
-  summaryEl.textContent = `Today's elevation for ${lakeName} is ${currentValue.toFixed(2)} feet above sea level. ${lakeName} is ${getDirectionWord(fromLastWeek)} ${Math.abs(fromLastWeek).toFixed(2)} feet from last week and ${Math.abs(fromLastYear).toFixed(2)} feet from this time last year. Forecasts project ${lakeName} to be ${getDirectionWord(nextWeekDelta)} ${Math.abs(nextWeekDelta).toFixed(2)} feet next week and ${getDirectionWord(nextMonthDelta)} ${Math.abs(nextMonthDelta).toFixed(2)} feet this time next month.`;
+  summaryEl.textContent = `Today's elevation for ${lakeName} is ${currentValue.toFixed(2)} feet above sea level. ${lakeName} is ${getDirectionWord(fromLastWeek)} ${Math.abs(fromLastWeek).toFixed(2)} feet from last week and ${getDirectionWord(fromLastYear)} ${Math.abs(fromLastYear).toFixed(2)} feet from this time last year. Forecasts project ${lakeName} to be ${getDirectionWord(nextWeekDelta)} ${Math.abs(nextWeekDelta).toFixed(2)} feet next week and ${getDirectionWord(nextMonthDelta)} ${Math.abs(nextMonthDelta).toFixed(2)} feet this time next month.`;
 }
 
 function drawTodayLine(chartInstance, cutoverMs) {
