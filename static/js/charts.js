@@ -9,6 +9,8 @@ let chartEnergyUnitHourlyInstance = null;
 
 const HISTORIC_SERIES_COLOR = "#1f78ff";
 const FORECAST_SERIES_COLOR = "#2e8b57";
+const HISTORIC_AREA_COLOR = "rgba(31, 120, 255, 0.35)";
+const FORECAST_AREA_COLOR = "rgba(46, 139, 87, 0.30)";
 
 // ==============================
 // WAIT UNTIL DOM IS READY
@@ -133,7 +135,7 @@ function renderElevationChart(containerId, payload) {
         lineStyle: { width: 2, color: HISTORIC_SERIES_COLOR },
         itemStyle: { color: HISTORIC_SERIES_COLOR },
         areaStyle: {
-          color: "rgba(31, 120, 255, 0.35)"
+          color: HISTORIC_AREA_COLOR
         }
       },
       {
@@ -144,7 +146,7 @@ function renderElevationChart(containerId, payload) {
         lineStyle: { width: 2, type: "dashed", color: FORECAST_SERIES_COLOR },
         itemStyle: { color: FORECAST_SERIES_COLOR },
         areaStyle: {
-          color: "rgba(46, 139, 87, 0.30)"
+          color: FORECAST_AREA_COLOR
         }
       }
     ]
@@ -406,6 +408,22 @@ function formatAsOfDateTime(value) {
   });
 }
 
+function formatDateWithDay(value) {
+  if (!value) return "Unknown date";
+
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+}
+
 function setElevationMessage(message) {
   const note = document.getElementById("g1-message");
   if (note) note.textContent = message || "";
@@ -499,7 +517,7 @@ function renderReleaseHourlyChart(payload) {
         data: historicData,
         barCategoryGap: "0%",
         barGap: "-100%",
-        itemStyle: { color: HISTORIC_SERIES_COLOR },
+        itemStyle: { color: HISTORIC_AREA_COLOR },
         emphasis: { focus: "series" }
       },
       {
@@ -508,7 +526,7 @@ function renderReleaseHourlyChart(payload) {
         data: forecastData,
         barCategoryGap: "0%",
         barGap: "-100%",
-        itemStyle: { color: FORECAST_SERIES_COLOR },
+        itemStyle: { color: FORECAST_AREA_COLOR },
         emphasis: { focus: "series" }
       }
     ]
@@ -527,7 +545,7 @@ async function loadReleaseHourlyDataForDate(dam, date) {
   setReleaseNavButtonState(payload.date);
 
   const formattedDam = dam.charAt(0).toUpperCase() + dam.slice(1);
-  setReleaseMessage(`Showing ${formattedDam} release for ${payload.date}. As of ${formatAsOfDateTime(payload.as_of)}.`);
+  setReleaseMessage(`Showing ${formattedDam} release for ${formatDateWithDay(payload.date)}. As of ${formatAsOfDateTime(payload.as_of)}.`);
 }
 
 async function initializeReleaseHourlyChart(dam) {
@@ -787,7 +805,7 @@ function renderEnergyUnitHourlyChart(payload) {
     visualMap: {
       min: minValue,
       max: maxValue,
-      calculable: true,
+      calculable: false,
       orient: "horizontal",
       left: "center",
       bottom: 5,
@@ -802,7 +820,15 @@ function renderEnergyUnitHourlyChart(payload) {
         data: heatmapData,
         label: {
           show: true,
-          formatter: (params) => params.data[2],
+          formatter: (params) => {
+            const value = Number(params.data[2]);
+            return value > 0 ? `{positive|${value}}` : `${value}`;
+          },
+          rich: {
+            positive: {
+              fontWeight: "bold"
+            }
+          },
           color: "#0e2239",
           fontSize: 11
         },
@@ -829,7 +855,7 @@ async function loadEnergyUnitHourlyDataForDate(dam, date) {
   setEnergyUnitNavButtonState(payload.date);
 
   const formattedDam = dam.charAt(0).toUpperCase() + dam.slice(1);
-  setEnergyUnitMessage(`Showing ${formattedDam} unit energy for ${payload.date}. As of ${formatAsOfDateTime(payload.as_of)}.`);
+  setEnergyUnitMessage(`Showing ${formattedDam} unit energy for ${formatDateWithDay(payload.date)}. As of ${formatAsOfDateTime(payload.as_of)}.`);
 }
 
 async function initializeEnergyUnitHourlyChart(dam) {
