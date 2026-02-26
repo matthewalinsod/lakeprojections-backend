@@ -9,7 +9,33 @@ from flask import render_template, abort, redirect, url_for
 
 app = Flask(__name__)
 print("MAIN.PY LOADED")
-DB_PATH = "/data/lakeprojections.db"
+PRIMARY_DB_PATH = "/data/lakeprojections.db"
+TEST_DB_PATH = "/data/old_lakeprojections.db"
+LOCAL_PRIMARY_DB_PATH = os.path.join(os.path.dirname(__file__), "data", "lakeprojections.db")
+LOCAL_TEST_DB_PATH = os.path.join(os.path.dirname(__file__), "data", "old_lakeprojections.db")
+
+
+def _resolve_db_path():
+    explicit_db_path = os.environ.get("LAKEPROJECTIONS_DB_PATH")
+    if explicit_db_path:
+        return explicit_db_path
+
+    use_test_db = os.environ.get("LAKEPROJECTIONS_USE_TEST_DB", "").strip().lower()
+    if use_test_db in {"1", "true", "yes", "on"}:
+        if os.path.exists(TEST_DB_PATH):
+            return TEST_DB_PATH
+        if os.path.exists(LOCAL_TEST_DB_PATH):
+            return LOCAL_TEST_DB_PATH
+
+    if os.path.exists(PRIMARY_DB_PATH):
+        return PRIMARY_DB_PATH
+    if os.path.exists(LOCAL_PRIMARY_DB_PATH):
+        return LOCAL_PRIMARY_DB_PATH
+
+    return PRIMARY_DB_PATH
+
+
+DB_PATH = _resolve_db_path()
 print("DB PATH EXISTS:", os.path.exists(DB_PATH))
 UPDATE_TOKEN = os.environ.get("UPDATE_TOKEN")
 
