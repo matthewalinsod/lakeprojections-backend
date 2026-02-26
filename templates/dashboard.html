@@ -16,9 +16,7 @@
 </div>
 {% elif subpage == 'elevation' %}
 <div class="dashboard-grid single-column">
-    <p class="graph-explainer graph-explainer-top">
-        {{ lake_name }} elevation data tracks the reservoir water-surface height associated with {{ dam_name }} operations and provides a direct operational signal for storage status in the Colorado River system. On this page, historic observations are paired with forecasted reservoir levels so you can evaluate recent performance and likely near-term direction in one view. The historic segment reflects measured conditions, while the forecast segment extends the trajectory under current planning assumptions used for basin operations. Monitoring Lake Mead elevation, Hoover Dam water levels, and related forecasted reservoir levels supports planning for releases, power generation, and seasonal hydrology shifts. Together, these signals help operators and stakeholders understand present supply conditions and how future water management choices may affect the broader river network.
-    </p>
+    <p id="elevationSummary" class="graph-explainer graph-explainer-top"></p>
 
     <div class="card">
         <div class="card-header">
@@ -35,6 +33,10 @@
         <div id="chartElevation" class="chart"></div>
         <div id="g1-message" class="chart-note"></div>
     </div>
+
+    <p class="graph-explainer graph-explainer-bottom">
+        {{ lake_name }} elevation data tracks the reservoir water-surface height associated with {{ dam_name }} operations and provides a direct operational signal for storage status in the Colorado River system. On this page, historic observations are paired with forecasted reservoir levels so you can evaluate recent performance and likely near-term direction in one view. The historic segment reflects measured conditions, while the forecast segment extends the trajectory under current planning assumptions used for basin operations. Monitoring Lake Mead elevation, Hoover Dam water levels, and related forecasted reservoir levels supports planning for releases, power generation, and seasonal hydrology shifts. Together, these signals help operators and stakeholders understand present supply conditions and how future water management choices may affect the broader river network.
+    </p>
 
     <p class="graph-explainer graph-explainer-bottom">
         To interpret this chart, first identify where the historic record ends and the forecast begins; that transition marks the model cutover from measured data to projected values. Short windows like MTD and 3M are useful for quick operational checks, while YTD and 5Y better reveal structural shifts, seasonality, and drought or recovery patterns. Use the MTD button for current-month sensitivity, 3M for recent trend direction, YTD for annual context, and 5Y for long-range baselines. Forecast segments should be viewed as scenario-guided planning outputs rather than fixed outcomes, especially during rapidly changing runoff or demand conditions. The projection framework aligns with the Bureau of Reclamation 24-Month Study methodology, allowing you to compare observed lake behavior against planning assumptions over time. Reading both segments together helps maintain long-term trend awareness while still supporting near-term operational decisions.

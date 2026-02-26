@@ -5,11 +5,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (page !== "dam" || !dam || !subpage) return;
 
+  let elevationSummaryPayload = null;
+
   async function loadElevation() {
     const activeButton = document.querySelector(".range-btn.active");
     const activeRange = activeButton ? activeButton.dataset.range : "30d";
-    const payload = await fetchElevationSeries(dam, activeRange);
-    renderElevationChart("chartElevation", payload);
+
+    const [payload, summaryPayload] = await Promise.all([
+      fetchElevationSeries(dam, activeRange),
+      elevationSummaryPayload
+        ? Promise.resolve(elevationSummaryPayload)
+        : fetchElevationSeries(dam, "5y")
+    ]);
+
+    elevationSummaryPayload = summaryPayload;
+    renderElevationChart("chartElevation", payload, elevationSummaryPayload);
   }
 
   async function loadLakeMeadRelease() {

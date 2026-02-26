@@ -158,13 +158,77 @@ function renderStitchedDailyChart({
   }
 }
 
-function renderElevationChart(containerId, payload) {
+function renderElevationChart(containerId, payload, summaryPayload = null) {
+  renderElevationSummary(summaryPayload || payload);
+
   renderStitchedDailyChart({
     containerId,
     payload,
     messageId: "g1-message",
     asOfLabelPrefix: "As of"
   });
+}
+
+function findClosestPointAtOrBefore(points, targetMs) {
+  let best = null;
+  for (const point of points) {
+    if (point[0] <= targetMs) {
+      best = point;
+      continue;
+    }
+    break;
+  }
+  return best;
+}
+
+function findClosestPointAtOrAfter(points, targetMs) {
+  for (const point of points) {
+    if (point[0] >= targetMs) {
+      return point;
+    }
+  }
+  return null;
+}
+
+function getDirectionWord(delta) {
+  if (delta > 0) return "up";
+  if (delta < 0) return "down";
+  return "unchanged";
+}
+
+function renderElevationSummary(payload) {
+  const summaryEl = document.getElementById("elevationSummary");
+  if (!summaryEl || !payload) return;
+
+  const lakeName = document.querySelector(".current-dam h2")?.textContent?.trim() || "the lake";
+  const historic = buildSeriesPoints(payload.historic || []);
+  const forecast = buildSeriesPoints(payload.forecast || []);
+
+  if (!historic.length) {
+    summaryEl.textContent = "Elevation summary is currently unavailable.";
+    return;
+  }
+
+  const currentPoint = historic[historic.length - 1];
+  const currentMs = currentPoint[0];
+  const currentValue = currentPoint[1];
+
+  const weekAgoPoint = findClosestPointAtOrBefore(historic, currentMs - (7 * 24 * 60 * 60 * 1000));
+  const yearAgoPoint = findClosestPointAtOrBefore(historic, currentMs - (365 * 24 * 60 * 60 * 1000));
+  const nextWeekPoint = findClosestPointAtOrAfter(forecast, currentMs + (7 * 24 * 60 * 60 * 1000));
+  const nextMonthPoint = findClosestPointAtOrAfter(forecast, currentMs + (30 * 24 * 60 * 60 * 1000));
+
+  if (!weekAgoPoint || !yearAgoPoint || !nextWeekPoint || !nextMonthPoint) {
+    summaryEl.textContent = "Elevation summary is currently unavailable.";
+    return;
+  }
+
+  const fromLastWeek = currentValue - weekAgoPoint[1];
+  const fromLastYear = currentValue - yearAgoPoint[1];
+  const nextWeekDelta = nextWeekPoint[1] - currentValue;
+  const nextMonthDelta = nextMonthPoint[1] - currentValue;
+
+  summaryEl.textContent = `Today's elevation for ${lakeName} is ${currentValue.toFixed(2)} feet above sea level. ${lakeName} is ${getDirectionWord(fromLastWeek)} ${Math.abs(fromLastWeek).toFixed(2)} feet from last week and ${Math.abs(fromLastYear).toFixed(2)} feet from this time last year. Forecasts project ${lakeName} to be ${getDirectionWord(nextWeekDelta)} ${Math.abs(nextWeekDelta).toFixed(2)} feet next week and ${getDirectionWord(nextMonthDelta)} ${Math.abs(nextMonthDelta).toFixed(2)} feet this time next month.`;
 }
 
 function drawTodayLine(chartInstance, cutoverMs) {
