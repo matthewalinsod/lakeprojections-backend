@@ -285,10 +285,21 @@ def api_elevation():
     sd_id = dam_to_sdid[dam]
     days_back = range_days[range_key]
 
+    payload = _build_daily_stitched_payload(sd_id, days_back)
+    if "error" in payload:
+        return jsonify(payload), 400
+
+    return jsonify({
+        "dam": dam,
+        "range": range_key,
+        **payload
+    })
+
+
+def _build_daily_stitched_payload(sd_id, days_back):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Determine true cutover = latest historic timestamp
     cursor.execute("""
         SELECT MAX(historic_datetime)
         FROM historic_daily_data
@@ -298,14 +309,12 @@ def api_elevation():
 
     if not cutover:
         conn.close()
-        return jsonify({"error": "No historic data found"}), 400
+        return {"error": "No historic data found"}
 
     cutover_dt = datetime.strptime(cutover, "%Y-%m-%dT%H:%M:%S")
     start_dt = cutover_dt - timedelta(days=days_back)
-
     start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%S")
 
-    # Historic window
     cursor.execute("""
         SELECT historic_datetime, value
         FROM historic_daily_data
@@ -318,7 +327,6 @@ def api_elevation():
 
     last_hist_value = historic_rows[-1]["value"] if historic_rows else None
 
-    # Latest forecast run
     cursor.execute("""
         SELECT MAX(datetime_accessed)
         FROM forecasted_daily_data
@@ -343,9 +351,7 @@ def api_elevation():
     historic = [{"t": r["historic_datetime"], "v": r["value"]} for r in historic_rows]
     forecast = [{"t": r["forecasted_datetime"], "v": r["value"]} for r in forecast_rows]
 
-    return jsonify({
-        "dam": dam,
-        "range": range_key,
+    return {
         "cutover": cutover,
         "as_of": latest_accessed,
         "historic": historic,
@@ -354,7 +360,40 @@ def api_elevation():
             "t": cutover,
             "v": last_hist_value
         }
+    }
+
+
+def _api_daily_metric(metric_name, sd_id):
+    range_key = (request.args.get("range") or "30d").lower().strip()
+    range_days = {
+        "30d": 30,
+        "90d": 90,
+        "365d": 365,
+        "5y": 1825
+    }
+
+    if range_key not in range_days:
+        return jsonify({"error": "Invalid range"}), 400
+
+    payload = _build_daily_stitched_payload(sd_id, range_days[range_key])
+    if "error" in payload:
+        return jsonify(payload), 400
+
+    return jsonify({
+        "metric": metric_name,
+        "range": range_key,
+        **payload
     })
+
+
+@app.route("/api/lake-mead/releases", methods=["GET"])
+def api_lake_mead_releases():
+    return _api_daily_metric("release", 1863)
+
+
+@app.route("/api/lake-mead/energy", methods=["GET"])
+def api_lake_mead_energy():
+    return _api_daily_metric("energy", 2070)
 
 
 # API release hourly for Chart 3 (Davis/Parker)

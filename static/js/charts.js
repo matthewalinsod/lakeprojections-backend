@@ -1,4 +1,3 @@
-let elevationChartInstance = null;
 let chart24msInstance = null;
 let chartReleaseHourlyInstance = null;
 let releaseAvailableDates = [];
@@ -6,6 +5,7 @@ let releaseDateSet = new Set();
 let energyUnitAvailableDates = [];
 let energyUnitDateSet = new Set();
 let chartEnergyUnitHourlyInstance = null;
+let stitchedChartInstances = {};
 
 const HISTORIC_SERIES_COLOR = "#1f78ff";
 const FORECAST_SERIES_COLOR = "#2e8b57";
@@ -70,29 +70,28 @@ function getActiveDam() {
 // GRAPH 1 — Elevation
 // ==============================
 
-function renderElevationChart(containerId, payload) {
-
+function renderStitchedDailyChart({
+  containerId,
+  payload,
+  yAxisName = "",
+  messageId,
+  asOfLabelPrefix = "As of"
+}) {
   const el = document.getElementById(containerId);
   if (!el || !payload) return;
 
-  if (!elevationChartInstance) {
-    elevationChartInstance = echarts.init(el);
-    window.addEventListener("resize", () => elevationChartInstance.resize());
+  if (!stitchedChartInstances[containerId]) {
+    stitchedChartInstances[containerId] = echarts.init(el);
+    window.addEventListener("resize", () => stitchedChartInstances[containerId].resize());
   }
 
+  const chart = stitchedChartInstances[containerId];
   const historic = buildSeriesPoints(payload.historic || []);
-
   const cutoverMs = isoToMs(payload.cutover);
 
   let forecast = buildSeriesPoints(payload.forecast || []);
-
-  // Forecasted elevation values should display at 2-decimal precision.
-  forecast = forecast.map(point => [point[0], roundToDecimals(point[1], 2)]);
-
-  // 🔥 Remove forecast values BEFORE today
   forecast = forecast.filter(point => point[0] > cutoverMs);
 
-  // Stitch forecast to historic
   if (
     payload.last_historic &&
     payload.last_historic.t &&
@@ -108,7 +107,7 @@ function renderElevationChart(containerId, payload) {
     }
   }
 
-  elevationChartInstance.setOption({
+  chart.setOption({
     animation: false,
     grid: { left: 60, right: 20, top: 50, bottom: 40 },
     tooltip: { trigger: "axis", axisPointer: { type: "cross" } },
@@ -124,7 +123,7 @@ function renderElevationChart(containerId, payload) {
       },
       splitNumber: 6
     },
-    yAxis: { type: "value", scale: true },
+    yAxis: { type: "value", scale: true, name: yAxisName },
     series: [
       {
         name: "Historic",
@@ -151,26 +150,38 @@ function renderElevationChart(containerId, payload) {
     ]
   }, true);
 
-  drawTodayLine(cutoverMs);
+  drawTodayLine(chart, cutoverMs);
 
-  setElevationMessage(`As of ${formatAsOfDateTime(payload.as_of)}.`);
+  const note = document.getElementById(messageId);
+  if (note) {
+    note.textContent = `${asOfLabelPrefix} ${formatAsOfDateTime(payload.as_of)}.`;
+  }
 }
 
-function drawTodayLine(cutoverMs) {
+function renderElevationChart(containerId, payload) {
+  renderStitchedDailyChart({
+    containerId,
+    payload,
+    messageId: "g1-message",
+    asOfLabelPrefix: "As of"
+  });
+}
 
-  if (!elevationChartInstance) return;
+function drawTodayLine(chartInstance, cutoverMs) {
 
-  const xPixel = elevationChartInstance.convertToPixel(
+  if (!chartInstance) return;
+
+  const xPixel = chartInstance.convertToPixel(
     { xAxisIndex: 0 },
     cutoverMs
   );
 
-  const grid = elevationChartInstance
+  const grid = chartInstance
     .getModel()
     .getComponent("grid")
     .coordinateSystem.getRect();
 
-  elevationChartInstance.setOption({
+  chartInstance.setOption({
     graphic: [
       {
         type: "line",
@@ -210,6 +221,27 @@ function drawTodayLine(cutoverMs) {
         silent: true
       }
     ]
+  });
+}
+
+
+function renderLakeMeadReleaseChart(payload) {
+  renderStitchedDailyChart({
+    containerId: "chartLakeMeadRelease",
+    payload,
+    yAxisName: "cfs",
+    messageId: "g3-mead-message",
+    asOfLabelPrefix: "As of"
+  });
+}
+
+function renderLakeMeadEnergyChart(payload) {
+  renderStitchedDailyChart({
+    containerId: "chartLakeMeadEnergy",
+    payload,
+    yAxisName: "MWh",
+    messageId: "g4-mead-message",
+    asOfLabelPrefix: "As of"
   });
 }
 
