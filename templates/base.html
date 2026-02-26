@@ -12,24 +12,22 @@
 <header>
     <div class="site-title-band">
         <h1>Lake Projections</h1>
+        <div id="weather-widget" class="weather-widget" aria-live="polite" data-city="{{ weather_city }}">
+            <span class="weather-city">{{ weather_city }}</span>
+            <span class="weather-status">Loading weather…</span>
+        </div>
     </div>
 
     <nav class="site-nav" aria-label="Primary">
-        <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-nav-list">☰ Menu</button>
-
         <ul id="site-nav-list" class="site-nav-list">
             <li class="nav-item">
                 <a class="nav-link {% if active_page == 'home' %}active{% endif %}" href="{{ url_for('home') }}">Home</a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link {% if active_page == 'about' %}active{% endif %}" href="{{ url_for('about') }}">About</a>
-            </li>
-
             {% for lake_slug, lake_data in lakes.items() %}
                 <li class="nav-item has-dropdown {% if active_lake == lake_slug %}active-top{% endif %}">
                     <div class="nav-lake-row">
                         <a class="nav-link {% if active_lake == lake_slug %}active{% endif %}" href="{{ url_for('lake_overview', lake_slug=lake_slug) }}">{{ lake_data.lake_name }}</a>
-                        <button type="button" class="nav-dropdown-toggle" aria-expanded="false" aria-label="Toggle {{ lake_data.lake_name }} menu">▾</button>
+                        <button type="button" class="nav-dropdown-toggle" aria-expanded="false" aria-label="Toggle {{ lake_data.lake_name }} menu"><span aria-hidden="true">▾</span></button>
                     </div>
 
                     <ul class="dropdown-menu" aria-label="{{ lake_data.lake_name }} sections">
@@ -52,10 +50,7 @@
     <div class="breadcrumb-wrap" aria-label="Breadcrumb">
         <nav class="breadcrumb">
             <a href="{{ url_for('home') }}">Home</a>
-            {% if active_page == 'about' %}
-                <span class="breadcrumb-sep">&gt;</span>
-                <span aria-current="page">About</span>
-            {% elif active_page == 'dam' and active_lake and active_subpage %}
+            {% if active_page == 'dam' and active_lake and active_subpage %}
                 <span class="breadcrumb-sep">&gt;</span>
                 <a href="{{ url_for('lake_overview', lake_slug=active_lake) }}">{{ lakes[active_lake].lake_name }}</a>
                 <span class="breadcrumb-sep">&gt;</span>
@@ -81,6 +76,7 @@
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
+<script src="{{ url_for('static', filename='js/weather.js') }}"></script>
 
 </body>
 </html>
