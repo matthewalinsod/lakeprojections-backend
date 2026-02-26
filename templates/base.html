@@ -14,22 +14,23 @@
 
     <nav class="primary-nav" aria-label="Primary">
         <a class="primary-nav-link {% if active_page == 'about' %}active{% endif %}" href="{{ url_for('about') }}">About</a>
-        {% for dam_key, dam_name in dams.items() %}
+        {% for lake_slug, lake_data in lakes.items() %}
             <a
-                class="primary-nav-link {% if active_dam == dam_key %}active{% endif %}"
-                href="{{ url_for('dam_subpage', dam=dam_key, subpage='overview') }}"
+                class="primary-nav-link primary-nav-link-lake {% if active_lake == lake_slug %}active{% endif %}"
+                href="{{ url_for('lake_overview', lake_slug=lake_slug) }}"
             >
-                {{ dam_name }}
+                <span class="lake-name">{{ lake_data.lake_name }}</span>
+                <span class="dam-subtext">{{ lake_data.dam_name }}</span>
             </a>
         {% endfor %}
     </nav>
 
     {% if active_page == 'dam' and active_dam %}
-    <nav class="secondary-nav" aria-label="Dam sections">
+    <nav class="secondary-nav" aria-label="Lake sections">
         {% for page_key, page_name in subpages.items() %}
             <a
                 class="secondary-nav-link {% if active_subpage == page_key %}active{% endif %}"
-                href="{{ url_for('dam_subpage', dam=active_dam, subpage=page_key) }}"
+                href="{{ url_for('lake_subpage', lake_slug=active_lake, subpage=page_key) }}"
             >
                 {{ page_name }}
             </a>
@@ -38,8 +39,14 @@
     {% endif %}
 </header>
 
-<main class="main-content">
-    {% block content %}{% endblock %}
+<main class="main-content-shell">
+    <aside class="ad-zone ad-zone-left" aria-hidden="true"></aside>
+    <section class="main-content-container">
+        <div class="main-content">
+            {% block content %}{% endblock %}
+        </div>
+    </section>
+    <aside class="ad-zone ad-zone-right" aria-hidden="true"></aside>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>

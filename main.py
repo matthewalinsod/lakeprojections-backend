@@ -13,11 +13,18 @@ DB_PATH = "/data/lakeprojections.db"
 print("DB PATH EXISTS:", os.path.exists(DB_PATH))
 UPDATE_TOKEN = os.environ.get("UPDATE_TOKEN")
 
-DAMS = {
-    "hoover": "Lake Mead (Hoover Dam)",
-    "davis": "Lake Mohave (Davis Dam)",
-    "parker": "Lake Havasu (Parker Dam)",
+LAKES = {
+    "lake-mead": {"dam": "hoover", "lake_name": "Lake Mead", "dam_name": "Hoover Dam"},
+    "lake-mohave": {"dam": "davis", "lake_name": "Lake Mohave", "dam_name": "Davis Dam"},
+    "lake-havasu": {"dam": "parker", "lake_name": "Lake Havasu", "dam_name": "Parker Dam"},
 }
+
+DAMS = {
+    lake_data["dam"]: f"{lake_data['lake_name']} ({lake_data['dam_name']})"
+    for lake_data in LAKES.values()
+}
+
+DAM_TO_LAKE_SLUG = {lake_data["dam"]: lake_slug for lake_slug, lake_data in LAKES.items()}
 
 SUBPAGES = {
     "overview": "Overview",
@@ -29,11 +36,14 @@ SUBPAGES = {
 
 
 def _page_context(page_kind="about", dam=None, subpage=None):
+    active_lake = DAM_TO_LAKE_SLUG.get(dam) if dam else None
     return {
+        "lakes": LAKES,
         "dams": DAMS,
         "subpages": SUBPAGES,
         "active_page": page_kind,
         "active_dam": dam,
+        "active_lake": active_lake,
         "active_subpage": subpage,
     }
 
@@ -172,24 +182,40 @@ def about():
     return render_template("about.html", **_page_context("about"))
 
 
-@app.route("/<dam>/<subpage>")
-def dam_subpage(dam, subpage):
-    dam = (dam or "").lower().strip()
+@app.route("/<lake_slug>")
+def lake_overview(lake_slug):
+    return lake_subpage(lake_slug, "overview")
+
+
+@app.route("/<lake_slug>/<subpage>")
+def lake_subpage(lake_slug, subpage):
+    lake_slug = (lake_slug or "").lower().strip()
     subpage = (subpage or "").lower().strip()
 
-    if dam not in DAMS or subpage not in SUBPAGES:
+    lake_data = LAKES.get(lake_slug)
+
+    if not lake_data and lake_slug in DAM_TO_LAKE_SLUG and subpage in SUBPAGES:
+        return redirect(
+            url_for("lake_subpage", lake_slug=DAM_TO_LAKE_SLUG[lake_slug], subpage=subpage),
+            code=301,
+        )
+
+    if not lake_data or subpage not in SUBPAGES:
         abort(404)
+
+    dam = lake_data["dam"]
 
     return render_template(
         "dashboard.html",
         dam=dam,
+        lake_slug=lake_slug,
+        lake_name=lake_data["lake_name"],
+        dam_name=lake_data["dam_name"],
         subpage=subpage,
         dam_label=DAMS[dam],
         subpage_label=SUBPAGES[subpage],
         **_page_context("dam", dam=dam, subpage=subpage),
     )
-
-
 @app.route("/health")
 def health():
     return "OK", 200
