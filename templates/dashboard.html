@@ -2,13 +2,7 @@
 
 {% block content %}
 
-<nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="{{ url_for('home') }}">Home</a>
-    <span class="breadcrumb-sep">&gt;</span>
-    <a href="{{ url_for('lake_overview', lake_slug=lake_slug) }}">{{ lake_name }}</a>
-    <span class="breadcrumb-sep">&gt;</span>
-    <span aria-current="page">{{ subpage_label }}</span>
-</nav>
+
 
 <div class="current-dam">
     <h2>{{ lake_name }}</h2>
@@ -46,7 +40,7 @@
         To interpret this chart, first identify where the historic record ends and the forecast begins; that transition marks the model cutover from measured data to projected values. Short windows like MTD and 3M are useful for quick operational checks, while YTD and 5Y better reveal structural shifts, seasonality, and drought or recovery patterns. Use the MTD button for current-month sensitivity, 3M for recent trend direction, YTD for annual context, and 5Y for long-range baselines. Forecast segments should be viewed as scenario-guided planning outputs rather than fixed outcomes, especially during rapidly changing runoff or demand conditions. The projection framework aligns with the Bureau of Reclamation 24-Month Study methodology, allowing you to compare observed lake behavior against planning assumptions over time. Reading both segments together helps maintain long-term trend awareness while still supporting near-term operational decisions.
     </p>
 </div>
-{% elif subpage == 'study' %}
+{% elif subpage == '24-month-study' %}
 <div class="dashboard-grid single-column">
     <div class="card">
         <div class="card-header">

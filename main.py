@@ -31,7 +31,11 @@ SUBPAGES = {
     "elevation": "Elevation",
     "releases": "Releases",
     "energy": "Energy",
-    "study": "24-Month Study",
+    "24-month-study": "24-Month Study",
+}
+
+LEGACY_SUBPAGES = {
+    "study": "24-month-study",
 }
 
 
@@ -191,6 +195,12 @@ def lake_overview(lake_slug):
 def lake_subpage(lake_slug, subpage):
     lake_slug = (lake_slug or "").lower().strip()
     subpage = (subpage or "").lower().strip()
+
+    if subpage in LEGACY_SUBPAGES:
+        return redirect(
+            url_for("lake_subpage", lake_slug=lake_slug, subpage=LEGACY_SUBPAGES[subpage]),
+            code=301,
+        )
 
     lake_data = LAKES.get(lake_slug)
 

@@ -9,34 +9,60 @@
 </head>
 <body data-dam="{{ active_dam or '' }}" data-subpage="{{ active_subpage or '' }}" data-page="{{ active_page or '' }}">
 
-<header class="site-header">
-    <h1>Lake Projections</h1>
+<header>
+    <div class="site-title-band">
+        <h1>Lake Projections</h1>
+    </div>
 
-    <nav class="primary-nav" aria-label="Primary">
-        <a class="primary-nav-link {% if active_page == 'about' %}active{% endif %}" href="{{ url_for('about') }}">About</a>
-        {% for lake_slug, lake_data in lakes.items() %}
-            <a
-                class="primary-nav-link primary-nav-link-lake {% if active_lake == lake_slug %}active{% endif %}"
-                href="{{ url_for('lake_overview', lake_slug=lake_slug) }}"
-            >
-                <span class="lake-name">{{ lake_data.lake_name }}</span>
-                <span class="dam-subtext">{{ lake_data.dam_name }}</span>
-            </a>
-        {% endfor %}
+    <nav class="site-nav" aria-label="Primary">
+        <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-nav-list">☰ Menu</button>
+
+        <ul id="site-nav-list" class="site-nav-list">
+            <li class="nav-item">
+                <a class="nav-link {% if active_page == 'home' %}active{% endif %}" href="{{ url_for('home') }}">Home</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_page == 'about' %}active{% endif %}" href="{{ url_for('about') }}">About</a>
+            </li>
+
+            {% for lake_slug, lake_data in lakes.items() %}
+                <li class="nav-item has-dropdown {% if active_lake == lake_slug %}active-top{% endif %}">
+                    <div class="nav-lake-row">
+                        <a class="nav-link {% if active_lake == lake_slug %}active{% endif %}" href="{{ url_for('lake_overview', lake_slug=lake_slug) }}">{{ lake_data.lake_name }}</a>
+                        <button type="button" class="nav-dropdown-toggle" aria-expanded="false" aria-label="Toggle {{ lake_data.lake_name }} menu">▾</button>
+                    </div>
+
+                    <ul class="dropdown-menu" aria-label="{{ lake_data.lake_name }} sections">
+                        {% for page_key, page_name in subpages.items() %}
+                            <li>
+                                <a
+                                    class="dropdown-link {% if active_lake == lake_slug and active_subpage == page_key %}active{% endif %}"
+                                    href="{{ url_for('lake_subpage', lake_slug=lake_slug, subpage=page_key) }}"
+                                >
+                                    {{ page_name }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endfor %}
+        </ul>
     </nav>
 
-    {% if active_page == 'dam' and active_dam %}
-    <nav class="secondary-nav" aria-label="Lake sections">
-        {% for page_key, page_name in subpages.items() %}
-            <a
-                class="secondary-nav-link {% if active_subpage == page_key %}active{% endif %}"
-                href="{{ url_for('lake_subpage', lake_slug=active_lake, subpage=page_key) }}"
-            >
-                {{ page_name }}
-            </a>
-        {% endfor %}
-    </nav>
-    {% endif %}
+    <div class="breadcrumb-wrap" aria-label="Breadcrumb">
+        <nav class="breadcrumb">
+            <a href="{{ url_for('home') }}">Home</a>
+            {% if active_page == 'about' %}
+                <span class="breadcrumb-sep">&gt;</span>
+                <span aria-current="page">About</span>
+            {% elif active_page == 'dam' and active_lake and active_subpage %}
+                <span class="breadcrumb-sep">&gt;</span>
+                <a href="{{ url_for('lake_overview', lake_slug=active_lake) }}">{{ lakes[active_lake].lake_name }}</a>
+                <span class="breadcrumb-sep">&gt;</span>
+                <span aria-current="page">{{ subpages[active_subpage] }}</span>
+            {% endif %}
+        </nav>
+    </div>
 </header>
 
 <main class="main-content-shell">
@@ -54,6 +80,7 @@
 <script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 
 </body>
 </html>
