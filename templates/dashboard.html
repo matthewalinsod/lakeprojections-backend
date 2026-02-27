@@ -66,6 +66,8 @@
 </div>
 {% elif subpage == 'releases' %}
 <div class="dashboard-grid single-column">
+    <p id="releaseSummary" class="graph-explainer graph-explainer-top" data-dam-name="{{ dam_name }}"></p>
+
     {% if dam in ['davis', 'parker'] %}
     <div class="card">
         <div class="card-header">

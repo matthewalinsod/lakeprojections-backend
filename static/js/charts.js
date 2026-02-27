@@ -300,6 +300,8 @@ function drawTodayLine(chartInstance, cutoverMs) {
 
 
 function renderLakeMeadReleaseChart(payload) {
+  renderReleaseSummary(payload);
+
   renderStitchedDailyChart({
     containerId: "chartLakeMeadRelease",
     payload,
@@ -307,6 +309,50 @@ function renderLakeMeadReleaseChart(payload) {
     messageId: "g3-mead-message",
     asOfLabelPrefix: "As of"
   });
+}
+
+function averageSeriesPointsInRange(points, startMs, endMs, { inclusiveStart = true, inclusiveEnd = true } = {}) {
+  const values = points
+    .filter(([timeMs]) => {
+      const afterStart = inclusiveStart ? timeMs >= startMs : timeMs > startMs;
+      const beforeEnd = inclusiveEnd ? timeMs <= endMs : timeMs < endMs;
+      return afterStart && beforeEnd;
+    })
+    .map(([, value]) => Number(value))
+    .filter(value => Number.isFinite(value));
+
+  if (!values.length) return null;
+
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return total / values.length;
+}
+
+function renderReleaseSummary(payload) {
+  const summaryEl = document.getElementById("releaseSummary");
+  if (!summaryEl || !payload) return;
+
+  const damName = summaryEl.dataset.damName?.trim() || document.querySelector(".current-dam p")?.textContent?.split("—")?.[0]?.trim() || "This";
+  const escapedDamName = escapeHtml(damName);
+  const historic = buildSeriesPoints(payload.historic || []);
+  const forecast = buildSeriesPoints(payload.forecast || []);
+  const cutoverMs = isoToMs(payload.cutover);
+
+  if (!historic.length || !forecast.length || Number.isNaN(cutoverMs)) {
+    summaryEl.textContent = "Release summary is currently unavailable.";
+    return;
+  }
+
+  const todayProjectedPoint = findClosestPointAtOrAfter(forecast, cutoverMs);
+  const previousWeekAverage = averageSeriesPointsInRange(historic, cutoverMs - (7 * 24 * 60 * 60 * 1000), cutoverMs, { inclusiveStart: false, inclusiveEnd: true });
+  const nextWeekAverage = averageSeriesPointsInRange(forecast, cutoverMs, cutoverMs + (7 * 24 * 60 * 60 * 1000), { inclusiveStart: false, inclusiveEnd: true });
+  const lastYearPoint = findClosestPointAtOrBefore(historic, cutoverMs - (365 * 24 * 60 * 60 * 1000));
+
+  if (!todayProjectedPoint || previousWeekAverage === null || nextWeekAverage === null || !lastYearPoint) {
+    summaryEl.textContent = "Release summary is currently unavailable.";
+    return;
+  }
+
+  summaryEl.innerHTML = `Today's average release from <strong>${escapedDamName}</strong> Dam is projected to be ${Math.round(todayProjectedPoint[1]).toLocaleString()} cfs. <strong>${escapedDamName}</strong> Dam's previous 7-day average release is ${Math.round(previousWeekAverage).toLocaleString()} cfs. Next week's 7-day average is projected to be ${Math.round(nextWeekAverage).toLocaleString()} cfs. At this time last year, <strong>${escapedDamName}</strong> Dam's daily release was ${Math.round(lastYearPoint[1]).toLocaleString()} cfs.`;
 }
 
 function renderLakeMeadEnergyChart(payload) {
