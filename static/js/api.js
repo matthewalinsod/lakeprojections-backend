@@ -9,18 +9,12 @@ async function fetchElevationSeries(dam, range) {
 }
 
 async function fetchReleaseSeries(dam, range) {
-  const damToRoute = {
-    hoover: "lake-mead",
-    davis: "lake-mohave",
-    parker: "lake-havasu"
-  };
-
-  const lakeRoute = damToRoute[dam];
-  if (!lakeRoute) {
+  const supportedDams = new Set(["hoover", "davis", "parker"]);
+  if (!supportedDams.has(dam)) {
     throw new Error(`Unsupported dam for release chart: ${dam}`);
   }
 
-  const url = `/api/${lakeRoute}/releases?range=${encodeURIComponent(range)}`;
+  const url = `/api/release/daily?dam=${encodeURIComponent(dam)}&range=${encodeURIComponent(range)}`;
   const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();

@@ -85,6 +85,20 @@ def _page_context(page_kind="home", dam=None, subpage=None):
     }
 
 
+
+
+def _parse_db_datetime(value):
+    if not value:
+        return None
+
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+
+    return datetime.fromisoformat(value)
+
 def _parse_24ms_month_label(month_label):
     """
     Parse a 24MS month label into a datetime for stable chronological sorting.
@@ -337,7 +351,7 @@ def _build_daily_stitched_payload(sd_id, days_back):
         conn.close()
         return {"error": "No historic data found"}
 
-    cutover_dt = datetime.strptime(cutover, "%Y-%m-%dT%H:%M:%S")
+    cutover_dt = _parse_db_datetime(cutover)
     start_dt = cutover_dt - timedelta(days=days_back)
     start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -407,6 +421,52 @@ def _api_daily_metric(metric_name, sd_id):
 
     return jsonify({
         "metric": metric_name,
+        "data_granularity": "daily",
+        "historic_source_table": "historic_daily_data",
+        "forecast_source_table": "forecasted_daily_data",
+        "range": range_key,
+        **payload
+    })
+
+
+@app.route("/api/release/daily", methods=["GET"])
+def api_release_daily_by_dam():
+    """
+    Explicit daily release endpoint by dam.
+    This route always reads from historic_daily_data + forecasted_daily_data.
+    """
+
+    dam = (request.args.get("dam") or "").lower().strip()
+    dam_to_sdid = {
+        "hoover": 1863,
+        "davis": 2166,
+        "parker": 2146
+    }
+
+    if dam not in dam_to_sdid:
+        return jsonify({"error": "Invalid dam"}), 400
+
+    range_key = (request.args.get("range") or "30d").lower().strip()
+    range_days = {
+        "30d": 30,
+        "90d": 90,
+        "365d": 365,
+        "5y": 1825
+    }
+
+    if range_key not in range_days:
+        return jsonify({"error": "Invalid range"}), 400
+
+    payload = _build_daily_stitched_payload(dam_to_sdid[dam], range_days[range_key])
+    if "error" in payload:
+        return jsonify(payload), 400
+
+    return jsonify({
+        "dam": dam,
+        "metric": "release",
+        "data_granularity": "daily",
+        "historic_source_table": "historic_daily_data",
+        "forecast_source_table": "forecasted_daily_data",
         "range": range_key,
         **payload
     })
@@ -1057,7 +1117,7 @@ def update_historic_hourly():
         conn.close()
         return jsonify({"error": "No existing historic hourly data found"}), 400
 
-    last_dt = datetime.strptime(max_dt, "%Y-%m-%dT%H:%M:%S")
+    last_dt = _parse_db_datetime(max_dt)
     start_dt = last_dt + timedelta(hours=1)
 
     today_utc = datetime.utcnow().date()
