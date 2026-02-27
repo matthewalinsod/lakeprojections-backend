@@ -99,6 +99,36 @@ def _parse_db_datetime(value):
 
     return datetime.fromisoformat(value)
 
+
+def _upsert_historic_value(cursor, table_name, datetime_col, iso_dt, sd_id, value):
+    """
+    Keep historic rows in sync with BOR source values.
+    We update existing points first, then insert when missing.
+    """
+    cursor.execute(
+        f"""
+        UPDATE {table_name}
+        SET value = ?
+        WHERE {datetime_col} = ?
+          AND sd_id = ?
+        """,
+        (value, iso_dt, sd_id),
+    )
+
+    if cursor.rowcount:
+        return "updated"
+
+    cursor.execute(
+        f"""
+        INSERT INTO {table_name}
+        ({datetime_col}, sd_id, value)
+        VALUES (?, ?, ?)
+        """,
+        (iso_dt, sd_id, value),
+    )
+
+    return "inserted"
+
 def _parse_24ms_month_label(month_label):
     """
     Parse a 24MS month label into a datetime for stable chronological sorting.
@@ -1038,6 +1068,7 @@ def update_historic():
         f"&t1={t1}"
         f"&t2={t2}"
         f"&table=R"
+        f"&mrid=4"
         f"&format=json"
     )
 
@@ -1046,6 +1077,121 @@ def update_historic():
         response.raise_for_status()
         data = response.json()
     except Exception as e:
+        conn.close()
+        return jsonify({"error": "API failure", "details": str(e)}), 500
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+
+    for series in data.get("Series", []):
+        sd_id = int(series["SDI"])
+        for point in series.get("Data", []):
+            try:
+                dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
+                iso_dt = dt.strftime("%Y-%m-%dT%H:%M:%S")
+                value = float(point["v"])
+
+                action = _upsert_historic_value(
+                    cursor,
+                    "historic_daily_data",
+                    "historic_datetime",
+                    iso_dt,
+                    sd_id,
+                    value,
+                )
+
+                if action == "inserted":
+                    inserted += 1
+                else:
+                    updated += 1
+
+            except Exception as e:
+                print("Row skipped due to error:", e)
+                skipped += 1
+
+    conn.commit()
+
+    cursor.execute("SELECT MAX(historic_datetime) FROM historic_daily_data")
+    new_max = cursor.fetchone()[0]
+
+    print("Inserted:", inserted)
+    print("Updated:", updated)
+    print("Skipped:", skipped)
+    print("Max datetime after update:", new_max)
+    print("=== HISTORIC DAILY UPDATE COMPLETE ===")
+
+    conn.close()
+
+    return jsonify({
+        "historic_inserted": inserted,
+        "historic_updated": updated,
+        "historic_skipped": skipped,
+        "range_start": t1,
+        "range_end": t2
+    })
+
+# ==============================
+# HISTORIC HOURLY UPDATE
+# ==============================
+
+@app.route("/internal/update/historic/daily/requery-7d", methods=["POST"])
+def requery_historic_daily_7d():
+
+    print("=== HISTORIC DAILY 7D REQUERY STARTED ===")
+
+    if not authorize(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    from zoneinfo import ZoneInfo
+    az = ZoneInfo("America/Phoenix")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    now_az = datetime.now(az)
+    today_az = now_az.date()
+    yesterday = today_az - timedelta(days=1)
+    start_date = yesterday - timedelta(days=6)
+
+    delete_start_iso = start_date.strftime("%Y-%m-%dT00:00:00")
+    delete_end_iso = yesterday.strftime("%Y-%m-%dT23:59:59")
+
+    t1 = start_date.strftime("%Y-%m-%dT00:00")
+    t2 = (yesterday + timedelta(days=1)).strftime("%Y-%m-%dT00:00")
+
+    print("AZ Today:", today_az)
+    print("Deleting range:", delete_start_iso, "to", delete_end_iso)
+    print("Requesting range:", t1, "to", t2)
+
+    cursor.execute(
+        """
+        DELETE FROM historic_daily_data
+        WHERE historic_datetime >= ?
+          AND historic_datetime <= ?
+        """,
+        (delete_start_iso, delete_end_iso),
+    )
+    deleted = cursor.rowcount
+
+    api_url = (
+        "https://www.usbr.gov/pn-bin/hdb/hdb.pl"
+        f"?svr=lchdb"
+        f"&sdi=1930%2C1863%2C2070%2C2100%2C2166%2C2071%2C2101%2C2146%2C2072"
+        f"&tstp=DY"
+        f"&t1={t1}"
+        f"&t2={t2}"
+        f"&table=R"
+        f"&mrid=4"
+        f"&format=json"
+    )
+
+    try:
+        response = requests.get(api_url, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        conn.rollback()
         conn.close()
         return jsonify({"error": "API failure", "details": str(e)}), 500
 
@@ -1060,43 +1206,36 @@ def update_historic():
                 iso_dt = dt.strftime("%Y-%m-%dT%H:%M:%S")
                 value = float(point["v"])
 
-                cursor.execute("""
-                    INSERT OR IGNORE INTO historic_daily_data
+                cursor.execute(
+                    """
+                    INSERT INTO historic_daily_data
                     (historic_datetime, sd_id, value)
                     VALUES (?, ?, ?)
-                """, (iso_dt, sd_id, value))
-
-                if cursor.rowcount == 1:
-                    inserted += 1
-                else:
-                    skipped += 1
-
+                    """,
+                    (iso_dt, sd_id, value),
+                )
+                inserted += 1
             except Exception as e:
                 print("Row skipped due to error:", e)
                 skipped += 1
 
     conn.commit()
 
-    cursor.execute("SELECT MAX(historic_datetime) FROM historic_daily_data")
-    new_max = cursor.fetchone()[0]
-
+    print("Deleted:", deleted)
     print("Inserted:", inserted)
     print("Skipped:", skipped)
-    print("Max datetime after update:", new_max)
-    print("=== HISTORIC DAILY UPDATE COMPLETE ===")
+    print("=== HISTORIC DAILY 7D REQUERY COMPLETE ===")
 
     conn.close()
 
     return jsonify({
-        "historic_inserted": inserted,
-        "historic_skipped": skipped,
+        "historic_daily_deleted": deleted,
+        "historic_daily_inserted": inserted,
+        "historic_daily_skipped": skipped,
         "range_start": t1,
-        "range_end": t2
+        "range_end": t2,
     })
 
-# ==============================
-# HISTORIC HOURLY UPDATE
-# ==============================
 
 @app.route("/internal/update/historic/hourly", methods=["POST"])
 def update_historic_hourly():
@@ -1154,6 +1293,7 @@ def update_historic_hourly():
         return jsonify({"error": "API failure", "details": str(e)}), 500
 
     inserted = 0
+    updated = 0
     skipped = 0
 
     for series in data.get("Series", []):
@@ -1164,14 +1304,20 @@ def update_historic_hourly():
                 iso_dt = dt.strftime("%Y-%m-%dT%H:%M:%S")
                 value = float(point["v"])
 
-                cursor.execute("""
-                    INSERT OR IGNORE INTO historic_hourly_data
-                    (historic_datetime, sd_id, value)
-                    VALUES (?, ?, ?)
-                """, (iso_dt, sd_id, value))
+                action = _upsert_historic_value(
+                    cursor,
+                    "historic_hourly_data",
+                    "historic_datetime",
+                    iso_dt,
+                    sd_id,
+                    value,
+                )
 
-                inserted += cursor.rowcount
-            except:
+                if action == "inserted":
+                    inserted += 1
+                else:
+                    updated += 1
+            except Exception:
                 skipped += 1
 
     conn.commit()
@@ -1180,6 +1326,7 @@ def update_historic_hourly():
     new_max = cursor.fetchone()[0]
 
     print("Inserted:", inserted)
+    print("Updated:", updated)
     print("Skipped:", skipped)
     print("Max datetime after update:", new_max)
     print("=== HISTORIC HOURLY UPDATE COMPLETE ===")
@@ -1188,6 +1335,7 @@ def update_historic_hourly():
 
     return jsonify({
         "historic_hourly_inserted": inserted,
+        "historic_hourly_updated": updated,
         "historic_hourly_skipped": skipped,
         "range_start": t1,
         "range_end": t2

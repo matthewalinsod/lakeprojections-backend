@@ -18,6 +18,7 @@ on:
           - historic
           - forecast
           - all
+          - historic_daily_requery_7d
 
 jobs:
   update:
@@ -89,6 +90,17 @@ jobs:
           "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic/hourly"
           echo "Waiting 10 seconds..."
           sleep 10
+
+      # =========================
+      # HISTORIC DAILY 7D REQUERY (MANUAL ONLY)
+      # =========================
+      - name: Requery Historic Daily Last 7 Days
+        if: steps.mode.outputs.type == 'historic_daily_requery_7d'
+        run: |
+          echo "---- Requerying Historic Daily Last 7 Days ----"
+          curl -v -X POST \
+          -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
+          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic/daily/requery-7d"
 
       # =========================
       # FORECAST DAILY
