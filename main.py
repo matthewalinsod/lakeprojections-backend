@@ -1049,15 +1049,25 @@ def update_historic():
     # Arizona time (no DST issues)
     now_az = datetime.now(az)
     today_az = now_az.date()
-    yesterday = today_az - timedelta(days=1)
+
+    end_date_param = (request.args.get("end_date") or "").strip()
+    if end_date_param:
+        try:
+            end_date = datetime.strptime(end_date_param, "%Y-%m-%d").date()
+        except ValueError:
+            conn.close()
+            return jsonify({"error": "Invalid end_date format. Use YYYY-MM-DD."}), 400
+    else:
+        end_date = today_az - timedelta(days=1)
 
     # Always fetch last 7 full days
-    start_date = yesterday - timedelta(days=6)
+    start_date = end_date - timedelta(days=6)
 
     t1 = start_date.strftime("%Y-%m-%dT00:00")
-    t2 = (yesterday + timedelta(days=1)).strftime("%Y-%m-%dT00:00")
+    t2 = (end_date + timedelta(days=1)).strftime("%Y-%m-%dT00:00")
 
     print("AZ Today:", today_az)
+    print("Historic end date:", end_date)
     print("Requesting range:", t1, "to", t2)
 
     api_url = (
@@ -1259,8 +1269,17 @@ def update_historic_hourly():
     last_dt = _parse_db_datetime(max_dt)
     start_dt = last_dt + timedelta(hours=1)
 
-    today_utc = datetime.utcnow().date()
-    end_dt = datetime.combine(today_utc, datetime.min.time())
+    end_date_param = (request.args.get("end_date") or "").strip()
+    if end_date_param:
+        try:
+            end_date = datetime.strptime(end_date_param, "%Y-%m-%d").date()
+        except ValueError:
+            conn.close()
+            return jsonify({"error": "Invalid end_date format. Use YYYY-MM-DD."}), 400
+    else:
+        end_date = datetime.utcnow().date() - timedelta(days=1)
+
+    end_dt = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
 
     if start_dt >= end_dt:
         print("Historic hourly already up to date.")

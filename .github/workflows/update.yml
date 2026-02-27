@@ -72,9 +72,11 @@ jobs:
         if: steps.mode.outputs.type == 'historic' || steps.mode.outputs.type == 'all'
         run: |
           echo "---- Running Historic Daily Update ----"
+          HISTORIC_END_DATE=$(date -u -d "yesterday" +"%Y-%m-%d")
+          echo "Using historic end date: ${HISTORIC_END_DATE}"
           curl -v -X POST \
           -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
-          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic"
+          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic?end_date=${HISTORIC_END_DATE}"
           echo "Waiting 10 seconds..."
           sleep 10
 
@@ -85,9 +87,11 @@ jobs:
         if: steps.mode.outputs.type == 'historic' || steps.mode.outputs.type == 'all'
         run: |
           echo "---- Running Historic Hourly Update ----"
+          HISTORIC_END_DATE=$(date -u -d "yesterday" +"%Y-%m-%d")
+          echo "Using historic end date: ${HISTORIC_END_DATE}"
           curl -v -X POST \
           -H "X-Update-Token: ${{ secrets.UPDATE_TOKEN }}" \
-          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic/hourly"
+          "${{ secrets.RENDER_UPDATE_URL }}/internal/update/historic/hourly?end_date=${HISTORIC_END_DATE}"
           echo "Waiting 10 seconds..."
           sleep 10
 
