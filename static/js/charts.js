@@ -196,11 +196,21 @@ function getDirectionWord(delta) {
   return "unchanged";
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function renderElevationSummary(payload) {
   const summaryEl = document.getElementById("elevationSummary");
   if (!summaryEl || !payload) return;
 
   const lakeName = summaryEl.dataset.lakeName?.trim() || document.querySelector(".current-dam h2")?.textContent?.trim() || "the lake";
+  const escapedLakeName = escapeHtml(lakeName);
   const historic = buildSeriesPoints(payload.historic || []);
   const forecast = buildSeriesPoints(payload.forecast || []);
 
@@ -228,7 +238,7 @@ function renderElevationSummary(payload) {
   const nextWeekDelta = nextWeekPoint[1] - currentValue;
   const nextMonthDelta = nextMonthPoint[1] - currentValue;
 
-  summaryEl.textContent = `Today's elevation for ${lakeName} is ${currentValue.toFixed(2)} feet above sea level. ${lakeName} is ${getDirectionWord(fromLastWeek)} ${Math.abs(fromLastWeek).toFixed(2)} feet from last week and ${getDirectionWord(fromLastYear)} ${Math.abs(fromLastYear).toFixed(2)} feet from this time last year. Forecasts project ${lakeName} to be ${getDirectionWord(nextWeekDelta)} ${Math.abs(nextWeekDelta).toFixed(2)} feet next week and ${getDirectionWord(nextMonthDelta)} ${Math.abs(nextMonthDelta).toFixed(2)} feet this time next month.`;
+  summaryEl.innerHTML = `Today's elevation for ${escapedLakeName} is <strong>${currentValue.toFixed(2)}</strong> feet above sea level. ${escapedLakeName} is <strong>${getDirectionWord(fromLastWeek)}</strong> <strong>${Math.abs(fromLastWeek).toFixed(2)}</strong> feet from last week and (<strong>${getDirectionWord(fromLastYear)}</strong>) <strong>${Math.abs(fromLastYear).toFixed(2)}</strong> feet from this time last year. Forecasts project ${escapedLakeName} to be <strong>${getDirectionWord(nextWeekDelta)}</strong> <strong>${Math.abs(nextWeekDelta).toFixed(2)}</strong> feet next week and <strong>${getDirectionWord(nextMonthDelta)}</strong> <strong>${Math.abs(nextMonthDelta).toFixed(2)}</strong> feet this time next month.`;
 }
 
 function drawTodayLine(chartInstance, cutoverMs) {
