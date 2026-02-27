@@ -6,6 +6,7 @@ import time
 import re
 from datetime import datetime, timedelta
 from flask import render_template, abort, redirect, url_for
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 print("MAIN.PY LOADED")
@@ -98,6 +99,15 @@ def _parse_db_datetime(value):
             continue
 
     return datetime.fromisoformat(value)
+
+
+def _az_today_start_naive():
+    """
+    Return Arizona "today at 00:00:00" as a naive datetime so it aligns
+    with naive DB timestamps stored in local AZ wall time.
+    """
+    az_now = datetime.now(ZoneInfo("America/Phoenix"))
+    return datetime.combine(az_now.date(), datetime.min.time())
 
 
 def _upsert_historic_value(cursor, table_name, datetime_col, iso_dt, sd_id, value):
@@ -370,11 +380,15 @@ def _build_daily_stitched_payload(sd_id, days_back):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    az_today_start = _az_today_start_naive()
+    az_today_start_iso = az_today_start.strftime("%Y-%m-%dT%H:%M:%S")
+
     cursor.execute("""
         SELECT MAX(historic_datetime)
         FROM historic_daily_data
         WHERE sd_id = ?
-    """, (sd_id,))
+          AND historic_datetime < ?
+    """, (sd_id, az_today_start_iso))
     cutover = cursor.fetchone()[0]
 
     if not cutover:
@@ -391,8 +405,9 @@ def _build_daily_stitched_payload(sd_id, days_back):
         WHERE sd_id = ?
           AND historic_datetime >= ?
           AND historic_datetime <= ?
+          AND historic_datetime < ?
         ORDER BY historic_datetime ASC
-    """, (sd_id, start_iso, cutover))
+    """, (sd_id, start_iso, cutover, az_today_start_iso))
     historic_rows = cursor.fetchall()
 
     last_hist_value = historic_rows[-1]["value"] if historic_rows else None
@@ -411,7 +426,7 @@ def _build_daily_stitched_payload(sd_id, days_back):
             FROM forecasted_daily_data
             WHERE sd_id = ?
               AND datetime_accessed = ?
-              AND forecasted_datetime >= ?
+              AND forecasted_datetime > ?
             ORDER BY forecasted_datetime ASC
         """, (sd_id, latest_accessed, cutover))
         forecast_rows = cursor.fetchall()
@@ -1040,7 +1055,6 @@ def update_historic():
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
 
-    from zoneinfo import ZoneInfo
     az = ZoneInfo("America/Phoenix")
 
     conn = get_db_connection()
@@ -1060,11 +1074,15 @@ def update_historic():
     else:
         end_date = today_az - timedelta(days=1)
 
+    # Daily historic must end at yesterday in AZ, never today.
+    if end_date >= today_az:
+        end_date = today_az - timedelta(days=1)
+
     # Always fetch last 7 full days
     start_date = end_date - timedelta(days=6)
 
     t1 = start_date.strftime("%Y-%m-%dT00:00")
-    t2 = (end_date + timedelta(days=1)).strftime("%Y-%m-%dT00:00")
+    t2 = end_date.strftime("%Y-%m-%dT23:59")
 
     print("AZ Today:", today_az)
     print("Historic end date:", end_date)
@@ -1100,7 +1118,10 @@ def update_historic():
             try:
                 dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
                 iso_dt = dt.strftime("%Y-%m-%dT%H:%M:%S")
-                value = float(point["v"])
+                raw_value = point.get("v")
+                if raw_value in (None, ""):
+                    raise ValueError("blank value")
+                value = float(raw_value)
 
                 action = _upsert_historic_value(
                     cursor,
@@ -1153,7 +1174,6 @@ def requery_historic_daily_7d():
     if not authorize(request):
         return jsonify({"error": "Unauthorized"}), 403
 
-    from zoneinfo import ZoneInfo
     az = ZoneInfo("America/Phoenix")
 
     conn = get_db_connection()
@@ -1165,10 +1185,12 @@ def requery_historic_daily_7d():
     start_date = yesterday - timedelta(days=6)
 
     delete_start_iso = start_date.strftime("%Y-%m-%dT00:00:00")
-    delete_end_iso = yesterday.strftime("%Y-%m-%dT23:59:59")
+    # Also clear any stray "today" rows so graph stitching cannot pick them up.
+    delete_end_iso = today_az.strftime("%Y-%m-%dT23:59:59")
 
     t1 = start_date.strftime("%Y-%m-%dT00:00")
-    t2 = (yesterday + timedelta(days=1)).strftime("%Y-%m-%dT00:00")
+    # Use an explicit end-of-day upper bound to avoid requesting today's daily row.
+    t2 = yesterday.strftime("%Y-%m-%dT23:59")
 
     print("AZ Today:", today_az)
     print("Deleting range:", delete_start_iso, "to", delete_end_iso)
@@ -1214,7 +1236,10 @@ def requery_historic_daily_7d():
             try:
                 dt = datetime.strptime(point["t"], "%m/%d/%Y %I:%M:%S %p")
                 iso_dt = dt.strftime("%Y-%m-%dT%H:%M:%S")
-                value = float(point["v"])
+                raw_value = point.get("v")
+                if raw_value in (None, ""):
+                    raise ValueError("blank value")
+                value = float(raw_value)
 
                 cursor.execute(
                     """
