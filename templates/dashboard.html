@@ -66,23 +66,7 @@
 </div>
 {% elif subpage == 'releases' %}
 <div class="dashboard-grid single-column">
-    {% if dam == 'hoover' %}
-    <div class="card">
-        <div class="card-header">
-            <h3>Releases (Historic + Forecast)</h3>
-
-            <div class="range-buttons">
-                <button class="range-btn range-btn-release active" data-range="30d">MTD</button>
-                <button class="range-btn range-btn-release" data-range="90d">3M</button>
-                <button class="range-btn range-btn-release" data-range="365d">YTD</button>
-                <button class="range-btn range-btn-release" data-range="5y">5Y</button>
-            </div>
-        </div>
-
-        <div id="chartLakeMeadRelease" class="chart"></div>
-        <div id="g3-mead-message" class="chart-note"></div>
-    </div>
-    {% elif dam in ['davis', 'parker'] %}
+    {% if dam in ['davis', 'parker'] %}
     <div class="card">
         <div class="card-header">
             <h3>Release by Hour (CFS)</h3>
@@ -98,6 +82,22 @@
         <div id="g3-message" class="chart-note"></div>
     </div>
     {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3>{{ lake_name }} Releases (Historic + Forecast)</h3>
+
+            <div class="range-buttons">
+                <button class="range-btn range-btn-release active" data-range="30d">MTD</button>
+                <button class="range-btn range-btn-release" data-range="90d">3M</button>
+                <button class="range-btn range-btn-release" data-range="365d">YTD</button>
+                <button class="range-btn range-btn-release" data-range="5y">5Y</button>
+            </div>
+        </div>
+
+        <div id="chartLakeMeadRelease" class="chart"></div>
+        <div id="g3-mead-message" class="chart-note"></div>
+    </div>
 </div>
 {% elif subpage == 'energy' %}
 <div class="dashboard-grid single-column">

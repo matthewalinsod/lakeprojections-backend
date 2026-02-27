@@ -417,6 +417,16 @@ def api_lake_mead_releases():
     return _api_daily_metric("release", 1863)
 
 
+@app.route("/api/lake-mohave/releases", methods=["GET"])
+def api_lake_mohave_releases():
+    return _api_daily_metric("release", 2166)
+
+
+@app.route("/api/lake-havasu/releases", methods=["GET"])
+def api_lake_havasu_releases():
+    return _api_daily_metric("release", 2146)
+
+
 @app.route("/api/lake-mead/energy", methods=["GET"])
 def api_lake_mead_energy():
     return _api_daily_metric("energy", 2070)
