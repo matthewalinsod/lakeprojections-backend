@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body data-dam="{{ active_dam or '' }}" data-subpage="{{ active_subpage or '' }}" data-page="{{ active_page or '' }}">
+<body data-dam="{{ active_dam or '' }}" data-lake="{{ active_lake or '' }}" data-subpage="{{ active_subpage or '' }}" data-page="{{ active_page or '' }}">
 
 <header>
     <div class="site-title-band">
@@ -62,7 +62,7 @@
 
 <main class="main-content-shell">
     <aside class="ad-zone ad-zone-left" aria-hidden="true"></aside>
-    <section class="main-content-container">
+    <section class="main-content-container {% if active_lake in ['lake-mead', 'lake-havasu'] %}lake-background lake-background-{{ active_lake }}{% endif %}">
         <div class="main-content">
             {% block content %}{% endblock %}
         </div>
