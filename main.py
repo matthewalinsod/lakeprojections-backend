@@ -72,7 +72,7 @@ def _page_context(page_kind="home", dam=None, subpage=None):
     if active_lake == "lake-mohave":
         weather_city = "Bullhead City"
     elif active_lake == "lake-havasu":
-        weather_city = "Havasu City"
+        weather_city = "Lake Havasu City"
 
     return {
         "lakes": LAKES,

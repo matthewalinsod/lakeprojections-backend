@@ -13,8 +13,14 @@
     <div class="site-title-band">
         <h1>Lake Projections</h1>
         <div id="weather-widget" class="weather-widget" aria-live="polite" data-city="{{ weather_city }}">
-            <span class="weather-city">{{ weather_city }}</span>
-            <span class="weather-status">Loading weather…</span>
+            <div class="weather-main">
+                <span class="weather-city">{{ weather_city }}</span>
+                <span class="weather-condition">Loading weather…</span>
+            </div>
+            <div class="weather-detail">
+                <span class="weather-icon" aria-hidden="true">⛅</span>
+                <span class="weather-metrics"></span>
+            </div>
         </div>
     </div>
 
