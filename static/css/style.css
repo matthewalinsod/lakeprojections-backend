@@ -23,11 +23,23 @@ body {
 }
 
 .site-title-band {
-    background: linear-gradient(100deg, #12263b, #1f4d7f 60%, #2e6da8);
+    position: relative;
+    overflow: hidden;
     color: #ffffff;
     padding: 24px 28px;
     text-align: left;
     box-shadow: 0 10px 24px rgba(6, 20, 36, 0.28);
+}
+
+.site-title-band::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, rgba(10, 25, 40, 0.7), rgba(17, 52, 88, 0.55) 60%, rgba(30, 75, 119, 0.55)), url("../images/Hoover.jpg");
+    background-size: cover;
+    background-position: center;
+    opacity: 0.92;
+    z-index: 0;
 }
 
 .site-title-band h1 {
@@ -41,6 +53,11 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
+}
+
+.site-title-band > * {
+    position: relative;
+    z-index: 1;
 }
 
 .weather-widget {
@@ -219,6 +236,51 @@ body {
     max-width: 1320px;
     width: 100%;
     margin: 0;
+}
+
+.lake-background {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    padding: 18px;
+}
+
+.lake-background::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: top center;
+    background-repeat: no-repeat;
+    opacity: 0.28;
+    z-index: 0;
+}
+
+.lake-background::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.72) 55%, #ffffff 100%);
+    z-index: 1;
+}
+
+.lake-background .main-content {
+    position: relative;
+    z-index: 2;
+}
+
+.lake-background-lake-mead::before {
+    background-image: url("../images/Penstocks.jpg");
+}
+
+.lake-background-lake-havasu::before {
+    background-image: url("../images/Parker.jpg");
+}
+
+.lake-background .current-dam,
+.lake-background .card {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(1px);
 }
 
 .main-content {
