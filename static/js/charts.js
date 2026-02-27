@@ -345,7 +345,8 @@ function renderReleaseSummary(payload) {
   const todayProjectedPoint = findClosestPointAtOrAfter(forecast, cutoverMs);
   const previousWeekAverage = averageSeriesPointsInRange(historic, cutoverMs - (7 * 24 * 60 * 60 * 1000), cutoverMs, { inclusiveStart: false, inclusiveEnd: true });
   const nextWeekAverage = averageSeriesPointsInRange(forecast, cutoverMs, cutoverMs + (7 * 24 * 60 * 60 * 1000), { inclusiveStart: false, inclusiveEnd: true });
-  const lastYearPoint = findClosestPointAtOrBefore(historic, cutoverMs - (365 * 24 * 60 * 60 * 1000));
+  const lastYearPayloadPoint = payload.last_year_historic?.t ? [[isoToMs(payload.last_year_historic.t), payload.last_year_historic.v]] : [];
+  const lastYearPoint = findClosestPointAtOrBefore(lastYearPayloadPoint.length ? lastYearPayloadPoint : historic, cutoverMs - (365 * 24 * 60 * 60 * 1000));
 
   if (!todayProjectedPoint || previousWeekAverage === null || nextWeekAverage === null || !lastYearPoint) {
     summaryEl.textContent = "Release summary is currently unavailable.";
