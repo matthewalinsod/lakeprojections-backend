@@ -22,10 +22,10 @@ document.addEventListener("DOMContentLoaded", () => {
     renderElevationChart("chartElevation", payload, elevationSummaryPayload);
   }
 
-  async function loadLakeMeadRelease() {
+  async function loadDailyRelease() {
     const activeButton = document.querySelector(".range-btn-release.active");
     const activeRange = activeButton ? activeButton.dataset.range : "30d";
-    const payload = await fetchLakeMeadReleaseSeries(activeRange);
+    const payload = await fetchReleaseSeries(dam, activeRange);
     renderLakeMeadReleaseChart(payload);
   }
 
@@ -37,12 +37,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadReleases() {
-    if (dam === "hoover") {
-      await loadLakeMeadRelease();
-      return;
-    }
+    await loadDailyRelease();
 
+    if (dam === "hoover") return;
     if (typeof initializeReleaseHourlyChart !== "function") return;
+
     await initializeReleaseHourlyChart(dam);
   }
 
@@ -70,16 +69,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (subpage === "releases") {
-    if (dam === "hoover") {
-      const rangeButtons = document.querySelectorAll(".range-btn-release");
-      rangeButtons.forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          rangeButtons.forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          await loadReleases();
-        });
+    const rangeButtons = document.querySelectorAll(".range-btn-release");
+    rangeButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        rangeButtons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        await loadReleases();
       });
-    }
+    });
 
     loadReleases().catch((err) => console.error(err));
   }
