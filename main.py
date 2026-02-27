@@ -410,6 +410,18 @@ def _build_daily_stitched_payload(sd_id, days_back):
     """, (sd_id, start_iso, cutover, az_today_start_iso))
     historic_rows = cursor.fetchall()
 
+    last_year_target_dt = cutover_dt - timedelta(days=365)
+    last_year_target_iso = last_year_target_dt.strftime("%Y-%m-%dT%H:%M:%S")
+    cursor.execute("""
+        SELECT historic_datetime, value
+        FROM historic_daily_data
+        WHERE sd_id = ?
+          AND historic_datetime <= ?
+        ORDER BY historic_datetime DESC
+        LIMIT 1
+    """, (sd_id, last_year_target_iso))
+    last_year_row = cursor.fetchone()
+
     last_hist_value = historic_rows[-1]["value"] if historic_rows else None
 
     cursor.execute("""
@@ -441,6 +453,10 @@ def _build_daily_stitched_payload(sd_id, days_back):
         "as_of": latest_accessed,
         "historic": historic,
         "forecast": forecast,
+        "last_year_historic": {
+            "t": last_year_row["historic_datetime"],
+            "v": last_year_row["value"]
+        } if last_year_row else None,
         "last_historic": {
             "t": cutover,
             "v": last_hist_value
